@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Training outputs
+results/
+logs/
+*.pth
+
+# TensorBoard
+runs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# SUMO large files (keep network/route XMLs but ignore generated outputs)
+*.log
+
+# Large archives
+*.zip
+*.tar.gz
+*.rar
