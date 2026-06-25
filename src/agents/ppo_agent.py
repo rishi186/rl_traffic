@@ -1,3 +1,9 @@
+"""Proximal Policy Optimization (PPO) agent implemented in PyTorch.
+
+Provides an Actor-Critic architecture with GAE for advantage estimation,
+clipped surrogate objective, and entropy bonus.
+"""
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -5,25 +11,36 @@ import numpy as np
 from typing import Dict, List, Tuple
 from collections import defaultdict
 
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
 class PPOAgent:
+    """Proximal Policy Optimization agent for traffic signal control.
+
+    Args:
+        obs_dim: Dimensionality of the observation vector.
+        action_dim: Number of discrete actions.
+        config: Full experiment configuration dictionary.
+        device: PyTorch device string (``"cpu"``, ``"cuda"``, ``"mps"``).
     """
-    Proximal Policy Optimization agent for traffic signal control
-    """
-    
-    def __init__(self, obs_dim: int, action_dim: int, config: dict, device: str):
+
+    def __init__(self, obs_dim: int, action_dim: int, config: dict, device: str) -> None:
         self.obs_dim = obs_dim
         self.action_dim = action_dim
         self.config = config
         self.device = torch.device(device)
         
-        self.lr = config['training']['learning_rate']
+        ppo_cfg = config['training'].get('ppo', {})
+        self.lr = config['training'].get('learning_rate', 5e-4)
         self.gamma = config['training']['gamma']
-        self.gae_lambda = config['training']['gae_lambda']
-        self.clip_epsilon = config['training']['clip_epsilon']
-        self.entropy_coef = config['training']['entropy_coef']
-        self.value_loss_coef = config['training']['value_loss_coef']
-        self.max_grad_norm = config['training']['max_grad_norm']
-        self.ppo_epochs = config['training']['ppo_epochs']
+        self.gae_lambda = ppo_cfg.get('gae_lambda', config['training'].get('gae_lambda', 0.95))
+        self.clip_epsilon = ppo_cfg.get('clip_epsilon', config['training'].get('clip_epsilon', 0.2))
+        self.entropy_coef = ppo_cfg.get('entropy_coef', config['training'].get('entropy_coef', 0.02))
+        self.value_loss_coef = ppo_cfg.get('value_loss_coef', config['training'].get('value_loss_coef', 0.5))
+        self.max_grad_norm = ppo_cfg.get('max_grad_norm', config['training'].get('max_grad_norm', 0.5))
+        self.ppo_epochs = ppo_cfg.get('ppo_epochs', config['training'].get('ppo_epochs', 10))
         self.batch_size = config['training']['batch_size']
         
         self.policy = ActorCritic(obs_dim, action_dim).to(self.device)
@@ -31,9 +48,9 @@ class PPOAgent:
         
         self.reset_storage()
         
-    def reset_storage(self):
-        """Reset storage for trajectory data"""
-        self.storage = defaultdict(list)
+    def reset_storage(self) -> None:
+        """Reset storage for trajectory data."""
+        self.storage: dict = defaultdict(list)
         
     def select_action(self, obs: np.ndarray, deterministic: bool = False) -> Tuple[int, float, float]:
         """
@@ -57,9 +74,27 @@ class PPOAgent:
         
         return action, log_prob, value.item()
     
-    def store_transition(self, agent_id: str, obs: np.ndarray, action: int, 
-                        reward: float, log_prob: float, value: float, done: bool):
-        """Store transition for later training"""
+    def store_transition(
+        self,
+        agent_id: str,
+        obs: np.ndarray,
+        action: int,
+        reward: float,
+        log_prob: float,
+        value: float,
+        done: bool,
+    ) -> None:
+        """Store a transition for a given agent.
+
+        Args:
+            agent_id: Traffic-light ID.
+            obs: Observation vector.
+            action: Action taken.
+            reward: Reward received.
+            log_prob: Log-probability of the action under the current policy.
+            value: Value estimate of the current state.
+            done: Whether the episode ended.
+        """
         self.storage[agent_id].append({
             'obs': obs,
             'action': action,
@@ -69,13 +104,23 @@ class PPOAgent:
             'done': done
         })
     
-    def compute_gae(self, rewards: List[float], values: List[float], 
-                    dones: List[bool], next_value: float) -> Tuple[List[float], List[float]]:
-        """
-        Compute Generalized Advantage Estimation
-        
+    def compute_gae(
+        self,
+        rewards: List[float],
+        values: List[float],
+        dones: List[bool],
+        next_value: float,
+    ) -> Tuple[List[float], List[float]]:
+        """Compute Generalized Advantage Estimation.
+
+        Args:
+            rewards: Per-step rewards.
+            values: Per-step value predictions.
+            dones: Per-step done flags.
+            next_value: Bootstrap value for the final state.
+
         Returns:
-            advantages, returns
+            Tuple of (advantages, returns).
         """
         advantages = []
         returns = []
@@ -96,8 +141,12 @@ class PPOAgent:
         
         return advantages, returns
     
-    def update(self):
-        """Update policy using PPO"""
+    def update(self) -> Dict[str, float]:
+        """Update policy using PPO clipped surrogate objective.
+
+        Returns:
+            Dict with policy_loss, value_loss, and entropy. Empty if no data.
+        """
         if not self.storage:
             return {}
         
@@ -198,41 +247,85 @@ class PPOAgent:
             'entropy': np.mean(entropy_losses)
         }
     
-    def save(self, path: str):
-        """Save model"""
+    def save(self, path: str) -> None:
+        """Save model weights and optimizer state.
+
+        Args:
+            path: Destination file path.
+        """
         torch.save({
             'policy_state_dict': self.policy.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
         }, path)
-        
-    def load(self, path: str):
-        """Load model"""
+        logger.info("PPO model saved to %s", path)
+
+    def load(self, path: str) -> None:
+        """Load model weights and optimizer state.
+
+        Args:
+            path: Source file path.
+        """
         checkpoint = torch.load(path, map_location=self.device)
         self.policy.load_state_dict(checkpoint['policy_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        logger.info("PPO model loaded from %s", path)
+
+    def get_config_summary(self) -> Dict[str, object]:
+        """Return a summary of agent configuration for logging.
+
+        Returns:
+            Dictionary of key hyperparameters.
+        """
+        return {
+            "algorithm": "PPO",
+            "obs_dim": self.obs_dim,
+            "action_dim": self.action_dim,
+            "learning_rate": self.lr,
+            "gamma": self.gamma,
+            "gae_lambda": self.gae_lambda,
+            "clip_epsilon": self.clip_epsilon,
+            "entropy_coef": self.entropy_coef,
+            "ppo_epochs": self.ppo_epochs,
+            "batch_size": self.batch_size,
+            "device": str(self.device),
+        }
 
 
 class ActorCritic(nn.Module):
-    """Actor-Critic network for PPO"""
-    
-    def __init__(self, obs_dim: int, action_dim: int, hidden_dim: int = 128):
+    """Actor-Critic network with shared feature extractor for PPO.
+
+    Args:
+        obs_dim: Input observation dimensionality.
+        action_dim: Number of discrete actions.
+        hidden_dim: Width of hidden layers.
+    """
+
+    def __init__(self, obs_dim: int, action_dim: int, hidden_dim: int = 128) -> None:
         super().__init__()
-        
+
         self.shared = nn.Sequential(
             nn.Linear(obs_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU()
+            nn.ReLU(),
         )
-        
+
         self.policy_head = nn.Sequential(
             nn.Linear(hidden_dim, action_dim),
-            nn.Softmax(dim=-1)
+            nn.Softmax(dim=-1),
         )
-        
+
         self.value_head = nn.Linear(hidden_dim, 1)
-        
-    def forward(self, obs):
+
+    def forward(self, obs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Forward pass.
+
+        Args:
+            obs: Batch of observations ``(B, obs_dim)``.
+
+        Returns:
+            Tuple of (action_probabilities, state_value).
+        """
         shared_features = self.shared(obs)
         action_probs = self.policy_head(shared_features)
         value = self.value_head(shared_features)

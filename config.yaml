@@ -1,43 +1,107 @@
-experiment:
-  name: "multi_agent_traffic_ppo"
-  seed: 42
-  device: "cpu" 
-  log_dir: "results"
-  
-sumo:
-  cfg_file: "maps/sumo.sumocfg"
-  use_gui: false
-  num_seconds: 5000 
-  delta_time: 5  
-  yellow_time: 3  
-  min_green: 5
-  max_green: 50
-  begin_time: 0
-  
+density_variants:
+  multipliers:
+  - 0.25
+  - 0.5
+  - 0.6
+  - 0.7
+  - 0.8
+  - 0.9
+  - 1
+  - 1.1
+  - 1.2
+  - 1.3
+  - 1.5
+  - 1.75
+  - 2
 environment:
-  reward_type: "diff-waiting-time" 
-  observation_type: "default" 
-  add_system_info: true
   add_per_agent_info: true
+  add_system_info: true
   normalize_observations: true
-  
-training:
-  algorithm: "ppo"
-  total_episodes: 100 
-  max_steps_per_episode: 1000 
-  batch_size: 64
-  learning_rate: 0.0005  
-  gamma: 0.99
-  gae_lambda: 0.95
-  clip_epsilon: 0.2
-  entropy_coef: 0.02 
-  value_loss_coef: 0.5
-  max_grad_norm: 0.5
-  ppo_epochs: 10
-  save_freq: 1 
-  eval_freq: 1
-  log_freq: 1
-  
+  observation_type: default
+  reward_type: custom-shaped
+  reward_weights:
+    congestion_penalty: 0.1
+    congestion_threshold: 0.8
+    emergency_weight: 0.2
+    queue_weight: 0.4
+    switch_penalty: 0.01
+    throughput_bonus: 0.05
+    waiting_time_weight: 0.4
 evaluation:
   num_episodes: 5
   save_video: false
+  video_dir: results/videos
+  video_fps: 10
+experiment:
+  device: cpu
+  log_dir: results
+  name: multi_agent_traffic_dqn
+  seed: 42
+sumo:
+  begin_time: 0
+  cfg_file: maps/sumo.sumocfg
+  delta_time: 5
+  density_multiplier: 1
+  max_green: 50
+  min_green: 5
+  num_seconds: 5000
+  use_gui: false
+  yellow_time: 3
+training:
+  algorithm: dqn
+  batch_size: 64
+  clip_epsilon: 0.2
+  dqn:
+    double_dqn: true
+    dueling: true
+    epsilon_decay: 0.995
+    epsilon_end: 0.01
+    epsilon_start: 1
+    grad_clip: 10
+    hidden_dims:
+    - 256
+    - 256
+    - 128
+    learning_rate: 0.0005
+    lr_scheduler: cosine
+    lr_scheduler_eta_min: 1.0e-06
+    lr_scheduler_gamma: 0.95
+    lr_scheduler_step_size: 1000
+    n_step: 1
+    noisy_net: false
+    noisy_sigma: 0.5
+    num_agents: 0
+    num_lane_features: 5
+    num_lanes: 0
+    per: false
+    per_alpha: 0.6
+    per_beta_frames: 100000
+    per_beta_start: 0.4
+    replay_buffer_size: 100000
+    soft_update_tau: 0.005
+    target_update_freq: 10
+    use_attention: false
+  early_stopping:
+    enabled: false
+    min_delta: 0
+    mode: max
+    patience: 15
+  entropy_coef: 0.02
+  eval_freq: 1
+  gae_lambda: 0.95
+  gamma: 0.99
+  learning_rate: 0.0005
+  log_freq: 1
+  max_grad_norm: 0.5
+  max_steps_per_episode: 1000
+  ppo:
+    clip_epsilon: 0.2
+    entropy_coef: 0.02
+    gae_lambda: 0.95
+    max_grad_norm: 0.5
+    ppo_epochs: 10
+    value_loss_coef: 0.5
+  ppo_epochs: 10
+  save_freq: 1
+  total_episodes: 100
+  value_loss_coef: 0.5

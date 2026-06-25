@@ -6,6 +6,7 @@ __pycache__/
 dist/
 build/
 *.egg
+.pytest_cache/
 
 # Virtual environments
 venv/
@@ -22,6 +23,9 @@ env/
 results/
 logs/
 *.pth
+*.h5
+saved_model/
+maps/density_variants/
 
 # TensorBoard
 runs/
@@ -37,3 +41,13 @@ Thumbs.db
 *.zip
 *.tar.gz
 *.rar
+
+# Node.js
+node_modules/
+web/frontend/dist/
+
+# Graphify
+graphify-out/
+
+# Devin workflows (internal)
+.devin/

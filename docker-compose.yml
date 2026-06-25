@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  train:
+    build: .
+    command: python scripts/train.py --config config.yaml
+    volumes:
+      - ./maps:/app/maps
+      - ./config.yaml:/app/config.yaml
+      - ./results:/app/results
+    environment:
+      - SUMO_HOME=/usr/share/sumo
+
+  evaluate:
+    build: .
+    command: python scripts/evaluate.py --config config.yaml --model results/models/best_model.pth
+    volumes:
+      - ./maps:/app/maps
+      - ./config.yaml:/app/config.yaml
+      - ./results:/app/results
+    environment:
+      - SUMO_HOME=/usr/share/sumo
+
+  baseline:
+    build: .
+    command: python scripts/baseline_fixed.py --config config.yaml --episodes 5
+    volumes:
+      - ./maps:/app/maps
+      - ./config.yaml:/app/config.yaml
+      - ./results:/app/results
+    environment:
+      - SUMO_HOME=/usr/share/sumo
+
+  generalization:
+    build: .
+    command: python scripts/evaluate_generalization.py --config config.yaml --model results/models/best_model.pth --mode runtime
+    volumes:
+      - ./maps:/app/maps
+      - ./config.yaml:/app/config.yaml
+      - ./results:/app/results
+    environment:
+      - SUMO_HOME=/usr/share/sumo
+
+  report:
+    build: .
+    command: >
+      sh -c "python src/visualization/plot_training.py --metrics results/training_metrics.json --output results/figures &&
+             python src/visualization/plot_comparison.py --eval results/eval/eval_results.json --baseline results/baseline/baseline_results.json --output results/figures &&
+             python scripts/generate_report.py --results-dir results"
+    volumes:
+      - ./results:/app/results
