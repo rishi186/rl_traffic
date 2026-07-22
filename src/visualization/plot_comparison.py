@@ -49,7 +49,7 @@ def plot_comparison(
         bl_std = baseline_data.get(f"std_{metric.replace('avg_', '')}", 0)
 
         x = np.arange(2)
-        bars = ax.bar(x, [bl_val, rl_val], yerr=[bl_std, rl_std],
+        ax.bar(x, [bl_val, rl_val], yerr=[bl_std, rl_std],
                       color=[colors_bl[i], colors_rl[i]], capsize=5, width=0.5,
                       edgecolor="white", linewidth=1.5)
         ax.set_xticks(x)
