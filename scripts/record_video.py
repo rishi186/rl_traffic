@@ -12,7 +12,6 @@ import os
 import sys
 import yaml
 import argparse
-import numpy as np
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
