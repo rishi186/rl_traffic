@@ -10,7 +10,6 @@ import json
 import argparse
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-import numpy as np
 from typing import List, Dict, Optional
 
 
@@ -55,14 +54,6 @@ def plot_signal_timeline(
 
     ids = sorted(timeline.keys())[:8]  # Limit to 8 for readability
 
-    phase_colors = {
-        "G": "#4CAF50",
-        "g": "#81C784",
-        "y": "#FFC107",
-        "Y": "#FFC107",
-        "r": "#F44336",
-        "R": "#F44336",
-    }
 
     fig, ax = plt.subplots(figsize=(14, max(3, len(ids) * 0.8)))
 
