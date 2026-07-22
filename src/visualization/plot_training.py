@@ -13,7 +13,6 @@ import json
 import argparse
 import matplotlib.pyplot as plt
 import numpy as np
-from typing import Optional
 
 
 def plot_training(
