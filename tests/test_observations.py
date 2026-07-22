@@ -4,7 +4,6 @@ Since observations require a running SUMO instance, these tests validate
 the observation construction logic using mock data and dimensional checks.
 """
 
-import pytest
 import numpy as np
 
 
