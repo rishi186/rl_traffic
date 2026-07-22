@@ -31,7 +31,7 @@ class PPOAgent:
         self.action_dim = action_dim
         self.config = config
         self.device = torch.device(device)
-        
+
         ppo_cfg = config['training'].get('ppo', {})
         self.lr = config['training'].get('learning_rate', 5e-4)
         self.gamma = config['training']['gamma']
@@ -42,28 +42,28 @@ class PPOAgent:
         self.max_grad_norm = ppo_cfg.get('max_grad_norm', config['training'].get('max_grad_norm', 0.5))
         self.ppo_epochs = ppo_cfg.get('ppo_epochs', config['training'].get('ppo_epochs', 10))
         self.batch_size = config['training']['batch_size']
-        
+
         self.policy = ActorCritic(obs_dim, action_dim).to(self.device)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=self.lr)
-        
+
         self.reset_storage()
-        
+
     def reset_storage(self) -> None:
         """Reset storage for trajectory data."""
         self.storage: dict = defaultdict(list)
-        
+
     def select_action(self, obs: np.ndarray, deterministic: bool = False) -> Tuple[int, float, float]:
         """
         Select action using current policy
-        
+
         Returns:
             action, log_prob, value
         """
         obs_tensor = torch.FloatTensor(obs).unsqueeze(0).to(self.device)
-        
+
         with torch.no_grad():
             action_probs, value = self.policy(obs_tensor)
-            
+
         if deterministic:
             action = torch.argmax(action_probs, dim=1).item()
             log_prob = torch.log(action_probs[0, action]).item()
@@ -71,9 +71,9 @@ class PPOAgent:
             dist = torch.distributions.Categorical(action_probs)
             action = dist.sample().item()
             log_prob = dist.log_prob(torch.tensor([action], device=self.device)).item()
-        
+
         return action, log_prob, value.item()
-    
+
     def store_transition(
         self,
         agent_id: str,
@@ -103,7 +103,7 @@ class PPOAgent:
             'value': value,
             'done': done
         })
-    
+
     def compute_gae(
         self,
         rewards: List[float],
@@ -125,9 +125,9 @@ class PPOAgent:
         advantages = []
         returns = []
         gae = 0
-        
+
         values = values + [next_value]
-        
+
         for t in reversed(range(len(rewards))):
             if dones[t]:
                 delta = rewards[t] - values[t]
@@ -135,12 +135,12 @@ class PPOAgent:
             else:
                 delta = rewards[t] + self.gamma * values[t + 1] - values[t]
                 gae = delta + self.gamma * self.gae_lambda * gae
-            
+
             advantages.insert(0, gae)
             returns.insert(0, gae + values[t])
-        
+
         return advantages, returns
-    
+
     def update(self) -> Dict[str, float]:
         """Update policy using PPO clipped surrogate objective.
 
@@ -149,24 +149,24 @@ class PPOAgent:
         """
         if not self.storage:
             return {}
-        
+
         all_obs = []
         all_actions = []
         all_old_log_probs = []
         all_advantages = []
         all_returns = []
-        
+
         for agent_id, transitions in self.storage.items():
             if len(transitions) == 0:
                 continue
-            
+
             obs = [t['obs'] for t in transitions]
             actions = [t['action'] for t in transitions]
             rewards = [t['reward'] for t in transitions]
             old_log_probs = [t['log_prob'] for t in transitions]
             values = [t['value'] for t in transitions]
             dones = [t['done'] for t in transitions]
-            
+
             if dones[-1]:
                 next_value = 0.0
             else:
@@ -175,78 +175,78 @@ class PPOAgent:
                 with torch.no_grad():
                     _, next_value = self.policy(obs_tensor)
                     next_value = next_value.item()
-            
+
             advantages, returns = self.compute_gae(rewards, values, dones, next_value)
-            
+
             all_obs.extend(obs)
             all_actions.extend(actions)
             all_old_log_probs.extend(old_log_probs)
             all_advantages.extend(advantages)
             all_returns.extend(returns)
-        
+
         if len(all_obs) == 0:
             return {}
-        
+
         obs_tensor = torch.FloatTensor(np.array(all_obs)).to(self.device)
         actions_tensor = torch.LongTensor(all_actions).to(self.device)
         old_log_probs_tensor = torch.FloatTensor(all_old_log_probs).to(self.device)
         advantages_tensor = torch.FloatTensor(all_advantages).to(self.device)
         returns_tensor = torch.FloatTensor(all_returns).to(self.device)
-        
+
         advantages_tensor = (advantages_tensor - advantages_tensor.mean()) / (advantages_tensor.std() + 1e-8)
-        
+
         dataset_size = len(all_obs)
         indices = np.arange(dataset_size)
-        
+
         policy_losses = []
         value_losses = []
         entropy_losses = []
-        
+
         for _ in range(self.ppo_epochs):
             np.random.shuffle(indices)
-            
+
             for start in range(0, dataset_size, self.batch_size):
                 end = min(start + self.batch_size, dataset_size)
                 batch_indices = indices[start:end]
-                
+
                 batch_obs = obs_tensor[batch_indices]
                 batch_actions = actions_tensor[batch_indices]
                 batch_old_log_probs = old_log_probs_tensor[batch_indices]
                 batch_advantages = advantages_tensor[batch_indices]
                 batch_returns = returns_tensor[batch_indices]
-                
+
                 action_probs, values = self.policy(batch_obs)
                 dist = torch.distributions.Categorical(action_probs)
                 new_log_probs = dist.log_prob(batch_actions)
                 entropy = dist.entropy().mean()
-                
+
                 ratio = torch.exp(new_log_probs - batch_old_log_probs)
-                
+
                 surr1 = ratio * batch_advantages
                 surr2 = torch.clamp(ratio, 1.0 - self.clip_epsilon, 1.0 + self.clip_epsilon) * batch_advantages
                 policy_loss = -torch.min(surr1, surr2).mean()
-                
+
                 value_loss = nn.MSELoss()(values.squeeze(), batch_returns)
-                
+
                 loss = policy_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy
-                
+
                 self.optimizer.zero_grad()
                 loss.backward()
                 nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
                 self.optimizer.step()
-                
+
                 policy_losses.append(policy_loss.item())
                 value_losses.append(value_loss.item())
                 entropy_losses.append(entropy.item())
-        
+
         self.reset_storage()
-        
+
         return {
             'policy_loss': np.mean(policy_losses),
             'value_loss': np.mean(value_losses),
             'entropy': np.mean(entropy_losses)
         }
-    
+
     def save(self, path: str) -> None:
         """Save model weights and optimizer state.
 
