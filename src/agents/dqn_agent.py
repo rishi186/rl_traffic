@@ -5,8 +5,7 @@ Supports standard and Dueling DQN, Double DQN, Prioritized Experience Replay
 """
 
 import os
-import math
-from typing import Dict, Tuple, Optional, List
+from typing import Dict, Tuple, List
 import numpy as np
 import torch
 import torch.nn as nn
