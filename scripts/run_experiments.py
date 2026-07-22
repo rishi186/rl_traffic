@@ -29,11 +29,11 @@ import json
 import yaml
 import argparse
 import itertools
-from typing import Dict, List, Any, Tuple
+from typing import List, Any, Tuple
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from src.utils.logger import setup_logger, get_logger
+from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
