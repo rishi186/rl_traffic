@@ -541,10 +541,10 @@ def train(config_path: str, resume: str = None):
     # Train
     if algorithm == "dqn":
         best_reward, _ = _train_dqn(agent, env, config, writer, log_dir,
-                                     wandb_logger=wandb_logger)
+                                    wandb_logger=wandb_logger)
     else:
         best_reward = _train_ppo(agent, env, config, writer, log_dir,
-                                  wandb_logger=wandb_logger)
+                                 wandb_logger=wandb_logger)
 
     logger.info("=" * 60)
     logger.info("Training complete! Best reward: %.2f", best_reward)
