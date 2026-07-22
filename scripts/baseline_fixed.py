@@ -80,7 +80,7 @@ def run_baseline(config_path: str, num_episodes: int = 5, output_dir: str = None
         for ts_id in ts_ids:
             lanes = list(set(traci.trafficlight.getControlledLanes(ts_id)))
             ts_lanes[ts_id] = [
-                l for l in lanes if not traci.lane.getEdgeID(l).startswith(":")
+                lane for lane in lanes if not traci.lane.getEdgeID(lane).startswith(":")
             ]
 
         step_waiting = []
