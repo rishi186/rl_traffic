@@ -5,7 +5,7 @@ and cross-field constraints.  Raises ``ConfigError`` with a descriptive
 message when validation fails.
 """
 
-from typing import List, Tuple
+from typing import List
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
