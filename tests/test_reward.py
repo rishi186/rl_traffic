@@ -6,7 +6,6 @@ gymnasium/traci at test time.
 """
 
 import pytest
-import numpy as np
 
 
 def _calculate_rewards(env, previous, current):
