@@ -11,8 +11,6 @@ Features:
     - Runtime density scaling through a ``density_multiplier`` config knob
 """
 
-import os
-import sys
 import random
 import numpy as np
 import traci
@@ -383,7 +381,6 @@ class MultiAgentSumoEnv(gym.Env):
 
                 # Throughput bonus: reward vehicles that cleared the intersection
                 if self.throughput_bonus > 0:
-                    throughput_delta = max(0, current[ts_id]["vehicle_count"] - previous[ts_id]["vehicle_count"])
                     # Actually, throughput is about vehicles leaving, not arriving
                     # Use the difference in pressure as a proxy
                     pressure_delta = previous[ts_id]["pressure"] - current[ts_id]["pressure"]
