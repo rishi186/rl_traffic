@@ -3,7 +3,6 @@
 import os
 import tempfile
 import numpy as np
-import pytest
 import torch
 
 from src.agents.dqn_agent import DQNAgent, QNetwork
