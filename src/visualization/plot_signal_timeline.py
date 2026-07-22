@@ -54,7 +54,6 @@ def plot_signal_timeline(
 
     ids = sorted(timeline.keys())[:8]  # Limit to 8 for readability
 
-
     fig, ax = plt.subplots(figsize=(14, max(3, len(ids) * 0.8)))
 
     for row, tid in enumerate(ids):
