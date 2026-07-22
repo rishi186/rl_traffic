@@ -7,7 +7,6 @@ import os
 import json
 import argparse
 import matplotlib.pyplot as plt
-import numpy as np
 
 
 def plot_generalization(
@@ -30,7 +29,6 @@ def plot_generalization(
     results = data["results"]
     multipliers = [r["multiplier"] for r in results]
     waiting_times = [r["avg_waiting_time"] for r in results]
-    queues = [r["avg_queue"] for r in results]
     improvements = [r.get("improvement_pct", None) for r in results]
     algorithm = data.get("algorithm", "DQN").upper()
 
