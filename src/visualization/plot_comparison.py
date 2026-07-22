@@ -50,8 +50,8 @@ def plot_comparison(
 
         x = np.arange(2)
         ax.bar(x, [bl_val, rl_val], yerr=[bl_std, rl_std],
-                      color=[colors_bl[i], colors_rl[i]], capsize=5, width=0.5,
-                      edgecolor="white", linewidth=1.5)
+               color=[colors_bl[i], colors_rl[i]], capsize=5, width=0.5,
+               edgecolor="white", linewidth=1.5)
         ax.set_xticks(x)
         ax.set_xticklabels(["Fixed-Time", algorithm])
         ax.set_ylabel(label)
