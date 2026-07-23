@@ -12,7 +12,7 @@ Built with PyTorch, SUMO simulation, and the TraCI API.
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-18%2B-61DAFB?logo=react&logoColor=white)](https://react.dev)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-53%20passing-success)](tests/)
+[![Tests](https://github.com/rishi186/rl_traffic/actions/workflows/ci.yml/badge.svg)](https://github.com/rishi186/rl_traffic/actions/workflows/ci.yml)
 
 </div>
 
