@@ -1,193 +1,90 @@
 import { useState, useEffect } from 'react'
-import { Play, Settings, Cpu, Activity, AlertCircle, Loader2 } from 'lucide-react'
-import { fetchAPI, postAPI } from '../lib/api'
-import { cn } from '../lib/utils'
+import { Play, Pause, AlertCircle } from 'lucide-react'
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { fetchAPI } from '../lib/api'
+
+const number = (value) => value == null ? 'N/A' : Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })
+const colors = { G: '#22c55e', g: '#86efac', y: '#facc15', Y: '#facc15', r: '#ef4444' }
 
 export default function Demo() {
-  const [config, setConfig] = useState(null)
-  const [models, setModels] = useState([])
-  const [selectedModel, setSelectedModel] = useState('')
-  const [running, setRunning] = useState(false)
-  const [result, setResult] = useState(null)
+  const [data, setData] = useState(null)
   const [error, setError] = useState(null)
-
+  const [index, setIndex] = useState(0)
+  const [playing, setPlaying] = useState(false)
+  useEffect(() => { fetchAPI('/api/benchmark/replay').then(setData).catch(e => setError(e.message)) }, [])
   useEffect(() => {
-    fetchAPI('/api/config').then(setConfig).catch(() => {})
-    fetchAPI('/api/models').then((data) => {
-      setModels(data)
-      if (data.length > 0) setSelectedModel(data[0].path)
-    }).catch(() => {})
-  }, [])
-
-  const handleRun = async () => {
-    setRunning(true)
-    setError(null)
-    setResult(null)
-    try {
-      // This would trigger a simulation run — placeholder for now
-      // In production, this would call /api/demo/run
-      await new Promise((r) => setTimeout(r, 2000))
-      setResult({
-        status: 'completed',
-        message: 'Simulation completed (demo mode — connect SUMO for full simulation)',
-        metrics: {
-          avg_waiting_time: 42.5,
-          avg_queue: 8.3,
-          throughput: 1250,
-        },
-      })
-    } catch (e) {
-      setError(e.message)
-    }
-    setRunning(false)
-  }
-
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-white flex items-center gap-3 mb-2">
-        <Play className="w-8 h-8 text-brand-400" />
-        Interactive Demo
-      </h1>
-      <p className="text-slate-400 mb-8">Configure and run traffic simulations with trained RL agents</p>
-
-      <div className="grid grid-cols-2 gap-6">
-        {/* Configuration panel */}
-        <div className="p-6 rounded-xl bg-slate-900 border border-slate-800 space-y-6">
-          <h3 className="text-white font-semibold flex items-center gap-2">
-            <Settings className="w-5 h-5 text-brand-400" />
-            Simulation Settings
-          </h3>
-
-          {/* Model selection */}
-          <div>
-            <label className="block text-sm text-slate-400 mb-2">Trained Model</label>
-            <select
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm focus:border-brand-500 focus:outline-none"
-            >
-              {models.length === 0 ? (
-                <option value="">No models available</option>
-              ) : (
-                models.map((m) => (
-                  <option key={m.path} value={m.path}>
-                    {m.experiment}/{m.name}
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
-
-          {/* Simulation parameters */}
-          {config && (
-            <>
-              <div>
-                <label className="block text-sm text-slate-400 mb-2">Traffic Density</label>
-                <input
-                  type="range"
-                  min="0.25"
-                  max="2.0"
-                  step="0.25"
-                  defaultValue={config.sumo?.density_multiplier || 1.0}
-                  className="w-full accent-brand-500"
-                />
-                <div className="flex justify-between text-xs text-slate-500 mt-1">
-                  <span>Light</span>
-                  <span>Heavy</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm text-slate-400 mb-2">Max Steps</label>
-                <input
-                  type="number"
-                  defaultValue={500}
-                  className="w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm focus:border-brand-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm text-slate-400 mb-2">Use GUI</label>
-                <div className="flex gap-3">
-                  <label className="flex items-center gap-2 text-sm text-slate-300">
-                    <input type="radio" name="gui" defaultChecked className="accent-brand-500" />
-                    Headless
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-slate-300">
-                    <input type="radio" name="gui" className="accent-brand-500" />
-                    GUI Mode
-                  </label>
-                </div>
-              </div>
-            </>
-          )}
-
-          <button
-            onClick={handleRun}
-            disabled={running || !selectedModel}
-            className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-medium transition-colors disabled:opacity-50"
-          >
-            {running ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
-            {running ? 'Running Simulation...' : 'Run Simulation'}
-          </button>
-
-          {error && (
-            <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
-              <AlertCircle className="w-4 h-4" />
-              {error}
-            </div>
-          )}
-        </div>
-
-        {/* Results panel */}
-        <div className="p-6 rounded-xl bg-slate-900 border border-slate-800">
-          <h3 className="text-white font-semibold flex items-center gap-2 mb-6">
-            <Activity className="w-5 h-5 text-brand-400" />
-            Results
-          </h3>
-
-          {!result && !running && (
-            <div className="h-64 flex items-center justify-center text-slate-600">
-              <div className="text-center">
-                <Cpu className="w-12 h-12 mx-auto mb-3 text-slate-700" />
-                <p>Run a simulation to see results</p>
-              </div>
-            </div>
-          )}
-
-          {running && (
-            <div className="h-64 flex items-center justify-center">
-              <div className="text-center">
-                <Loader2 className="w-12 h-12 mx-auto mb-3 text-brand-400 animate-spin" />
-                <p className="text-slate-400">Running simulation...</p>
-              </div>
-            </div>
-          )}
-
-          {result && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-green-400 text-sm font-medium">
-                <span className="w-2 h-2 rounded-full bg-green-500" />
-                {result.status}
-              </div>
-              <p className="text-slate-400 text-sm">{result.message}</p>
-
-              <div className="grid grid-cols-3 gap-4 pt-4">
-                {[
-                  { label: 'Avg Wait Time', value: `${result.metrics.avg_waiting_time}s`, color: 'text-red-400' },
-                  { label: 'Avg Queue', value: result.metrics.avg_queue, color: 'text-yellow-400' },
-                  { label: 'Throughput', value: result.metrics.throughput, color: 'text-green-400' },
-                ].map((m) => (
-                  <div key={m.label} className="p-4 rounded-lg bg-slate-800 border border-slate-700">
-                    <div className={cn('text-2xl font-bold', m.color)}>{m.value}</div>
-                    <div className="text-xs text-slate-500 mt-1">{m.label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+    if (!playing || !data) return
+    const timer = setInterval(() => setIndex(i => {
+      if (i >= data.panels[0].timeline.length - 1) { setPlaying(false); return i }
+      return i + 1
+    }), 120)
+    return () => clearInterval(timer)
+  }, [playing, data])
+  if (error) return <div className="p-8 text-amber-300" role="alert"><AlertCircle className="mb-3" />{error}</div>
+  if (!data) return <p className="p-8 text-slate-400">Loading verified paired replay…</p>
+  const ticks = data.panels[0].timeline
+  const tick = ticks[index]
+  const chart = ticks.map((t, i) => ({ second: t.elapsed_s, fixed: t.network_stopped,
+    dqn: data.panels[1].timeline[i].network_stopped,
+    fixedQueue: t.signal.queue, dqnQueue: data.panels[1].timeline[i].signal.queue }))
+  return <div className="p-5 md:p-8 space-y-6 text-slate-200">
+    <div><p className="text-brand-400 text-sm uppercase tracking-widest">Recorded SUMO benchmark</p>
+      <h1 className="text-3xl font-bold text-white mt-2">Two policies. One clock.</h1>
+      <p className="text-slate-400 mt-2">{data.label} · {data.scenario} demand · matched seed {data.seed} · simulated time {tick.simulated_second}s</p>
+      <p className="text-sm text-slate-500 mt-1">This replays measured artifacts. Final trip statistics below cover the whole episode.</p></div>
+    <div className="flex gap-4 items-center bg-slate-900 p-4 rounded-xl border border-slate-800">
+      <button aria-label={playing ? 'Pause replay' : 'Play replay'} className="p-3 bg-brand-600 rounded-lg" onClick={() => {
+        if (index === ticks.length - 1) setIndex(0)
+        setPlaying(!playing)
+      }}>{playing ? <Pause size={18} /> : <Play size={18} />}</button>
+      <input aria-label="Replay simulated second" type="range" min="0" max={ticks.length - 1} value={index}
+        className="flex-1" onChange={e => { setPlaying(false); setIndex(Number(e.target.value)) }} />
+      <span className="tabular-nums">{tick.elapsed_s} / {ticks.length}s</span>
     </div>
-  )
+    <div className="grid md:grid-cols-2 gap-5">{data.panels.map((panel, p) => {
+      const t = panel.timeline[index], m = panel.metrics
+      const action = panel.actions.find(a => a.elapsed_s >= t.elapsed_s)
+      return <section key={panel.policy} className="p-5 bg-slate-900 border border-slate-800 rounded-xl space-y-4">
+        <div className="flex justify-between"><h2 className="text-xl font-semibold uppercase">{panel.policy === 'fixed' ? 'Fixed time' : `${panel.policy} · train seed ${m.training_seed}`}</h2>
+          <span className="text-sm text-slate-400">t = {t.simulated_second}s</span></div>
+        <p className="text-xs text-slate-400 break-all">Signal {data.signal_id} · SUMO link order</p>
+        <div className="flex flex-wrap gap-1.5" aria-label={`Signal state ${t.signal.state}`}>
+          {[...t.signal.state].map((state, i) => <span key={i} title={`Link ${i}: ${state}`}
+            className="w-6 h-6 rounded-full text-black text-xs grid place-content-center" style={{ background: colors[state] || '#94a3b8' }}>{state}</span>)}
+        </div>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div>Network stopped now<strong className="block text-2xl text-white">{t.network_stopped}</strong></div>
+          <div>Selected signal queue now<strong className="block text-2xl text-white">{t.signal.queue}</strong></div>
+        </div>
+        <p className="text-xs text-slate-400">{p === 0 ? 'SUMO runs the common fixed program.' : `Decision window request / switch initiated in window: ${action?.requested[data.signal_id] ?? '—'} / ${action?.applied[data.signal_id] ?? '—'} (0 hold, 1 switch).`}</p>
+        <dl className="text-sm grid grid-cols-2 gap-y-2 border-t border-slate-800 pt-4">
+          <dt>Final stopped vehicle-seconds</dt><dd>{number(m.network_stopped_vehicle_seconds)}</dd>
+          <dt>Final completed / scheduled</dt><dd>{m.completed} / {m.scheduled_demand}</dd>
+          <dt>Final unfinished / uninserted</dt><dd>{m.unfinished} / {m.uninserted}</dd>
+          <dt>Completed trips: mean wait</dt><dd>{number(m.trip_wait_completed_mean_s)} s</dd>
+          <dt>Completed trips: p95 wait</dt><dd>{number(m.trip_wait_completed_p95_s)} s</dd>
+          <dt>Completed trips: mean duration</dt><dd>{number(m.trip_duration_completed_mean_s)} s</dd>
+        </dl>
+      </section>
+    })}</div>
+    <section className="p-5 bg-slate-900 rounded-xl border border-slate-800">
+      <h2 className="font-semibold mb-5">Network stopped vehicles and selected signal queues</h2>
+      <div style={{ width: '100%', height: 280 }}><ResponsiveContainer><LineChart data={chart}>
+        <XAxis dataKey="second" tick={{ fill: '#94a3b8' }} /><YAxis tick={{ fill: '#94a3b8' }} />
+        <Tooltip contentStyle={{ background: '#0f172a', borderColor: '#334155' }} /><Legend />
+        <Line dataKey="fixed" name="Fixed: network stopped" stroke="#fbbf24" dot={false} isAnimationActive={false} />
+        <Line dataKey="dqn" name="DQN: network stopped" stroke="#38bdf8" dot={false} isAnimationActive={false} />
+        <Line dataKey="fixedQueue" name="Fixed: signal queue" stroke="#fbbf24" strokeDasharray="4 4" dot={false} isAnimationActive={false} />
+        <Line dataKey="dqnQueue" name="DQN: signal queue" stroke="#38bdf8" strokeDasharray="4 4" dot={false} isAnimationActive={false} />
+        <ReferenceLine x={tick.elapsed_s} stroke="#fff" />
+      </LineChart></ResponsiveContainer></div>
+    </section>
+    <details className="text-sm text-slate-400 bg-slate-900 rounded-xl p-5" open>
+      <summary className="cursor-pointer text-slate-200">Provenance and limits</summary>
+      <p className="mt-3">{data.provenance.sumo} · Python {data.provenance.python.split(' ')[0]} · Git {data.provenance.git_revision.slice(0, 12)}</p>
+      <p className="break-all mt-2">Match: {data.match_id}<br />Raw CSV SHA-256: {data.raw_csv_sha256}<br />Source digest: {data.provenance.source_digest}</p>
+      <div className="mt-3 space-y-2">{Object.entries(data.models || {}).map(([path, hash]) => <p className="break-all" key={path}>Checkpoint SHA-256: {hash}</p>)}</div>
+      <ul className="list-disc pl-5 mt-3 space-y-1">{data.limitations.map(l => <li key={l}>{l}</li>)}</ul>
+    </details>
+  </div>
 }

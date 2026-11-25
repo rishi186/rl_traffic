@@ -51,3 +51,6 @@ graphify-out/
 
 # Devin workflows (internal)
 .devin/
+
+# Local engineering session state (public evidence is in docs/benchmark/)
+.gravitas/

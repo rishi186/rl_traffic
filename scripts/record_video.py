@@ -68,7 +68,12 @@ def record_simulation(
         from src.agents.ppo_agent import PPOAgent
         device = config["experiment"].get("device", "cpu")
         agent = PPOAgent(obs_dim, action_dim, config, device)
-    agent.load(model_path)
+    from src.utils.provenance import load_checked
+    try:
+        load_checked(agent, model_path, env.observation_schema)
+    except BaseException:
+        env.close()
+        raise
 
     logger.info("Recording simulation with %s agent (max %d steps)", algorithm.upper(), max_steps)
 
@@ -93,8 +98,8 @@ def record_simulation(
                 action, _, _ = agent.select_action(observations[ts_id], deterministic=True)
                 actions[ts_id] = action
 
-            observations, rewards, dones, _, infos = env.step(actions)
-            done = dones["__all__"]
+            observations, rewards, dones, truncateds, infos = env.step(actions)
+            done = dones["__all__"] or truncateds['__all__']
 
             # Capture screenshot via TraCI GUI
             try:

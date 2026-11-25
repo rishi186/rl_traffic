@@ -32,6 +32,16 @@ def plot_signal_timeline(
     """
     os.makedirs(output_dir, exist_ok=True)
 
+    seconds = isinstance(phase_log, dict)
+    if seconds:
+        source = phase_log['panels'][0] if 'panels' in phase_log else phase_log
+        signal_id = phase_log.get('signal_id', 'selected')
+        phase_log = [
+            {'step': tick['elapsed_s'], 'ts_id': tid, 'phase_state': state['state']}
+            for tick in source['timeline']
+            for tid, state in tick.get('signals', {signal_id: tick.get('signal', {})}).items()
+        ]
+
     if not phase_log:
         print("No phase log data provided. Skipping signal timeline plot.")
         return
@@ -75,7 +85,7 @@ def plot_signal_timeline(
 
     ax.set_yticks(range(len(ids)))
     ax.set_yticklabels(ids, fontsize=8)
-    ax.set_xlabel("Simulation Step")
+    ax.set_xlabel("Measured simulated seconds after warm-up" if seconds else "Legacy sample index (duration unspecified)")
     ax.set_title("Traffic Signal Phase Timeline")
     ax.invert_yaxis()
 

@@ -1,0 +1,1040 @@
+{
+  "schema_version": 2,
+  "label": "Tirupati demo (synthetic traffic, one matched seed)",
+  "config": {
+    "density_variants": {
+      "multipliers": [
+        0.25,
+        0.5,
+        0.6,
+        0.7,
+        0.8,
+        0.9,
+        1,
+        1.1,
+        1.2,
+        1.3,
+        1.5,
+        1.75,
+        2
+      ]
+    },
+    "environment": {
+      "add_per_agent_info": true,
+      "add_system_info": true,
+      "normalize_observations": true,
+      "observation_type": "default",
+      "reward_type": "custom-shaped",
+      "reward_weights": {
+        "congestion_penalty": 0.1,
+        "congestion_threshold": 0.8,
+        "emergency_weight": 0.2,
+        "queue_weight": 0.4,
+        "switch_penalty": 0.01,
+        "incoming_count_decrease_bonus": 0.05,
+        "waiting_time_weight": 0.4
+      }
+    },
+    "evaluation": {
+      "num_episodes": 5,
+      "save_video": false,
+      "video_dir": "results/videos",
+      "video_fps": 10
+    },
+    "experiment": {
+      "device": "cpu",
+      "log_dir": "results",
+      "name": "multi_agent_traffic_dqn",
+      "seed": 42
+    },
+    "sumo": {
+      "begin_time": 0,
+      "cfg_file": "maps/tirupati/tirupati.sumocfg",
+      "delta_time": 5,
+      "density_multiplier": 1,
+      "max_green": 50,
+      "min_green": 5,
+      "num_seconds": 600,
+      "warmup_seconds": 5,
+      "all_red_time": 1,
+      "terminate_when_empty": false,
+      "use_gui": false,
+      "yellow_time": 3
+    },
+    "training": {
+      "algorithm": "dqn",
+      "batch_size": 64,
+      "clip_epsilon": 0.2,
+      "dqn": {
+        "double_dqn": true,
+        "dueling": true,
+        "epsilon_decay": 0.995,
+        "epsilon_end": 0.01,
+        "epsilon_start": 1,
+        "grad_clip": 10,
+        "hidden_dims": [
+          256,
+          256,
+          128
+        ],
+        "learning_rate": 0.0005,
+        "lr_scheduler": "cosine",
+        "lr_scheduler_total_steps": 100000,
+        "lr_scheduler_eta_min": 1e-06,
+        "lr_scheduler_gamma": 0.95,
+        "lr_scheduler_step_size": 1000,
+        "n_step": 1,
+        "noisy_net": false,
+        "noisy_sigma": 0.5,
+        "num_agents": 0,
+        "num_lane_features": 5,
+        "num_lanes": 0,
+        "per": false,
+        "per_alpha": 0.6,
+        "per_beta_frames": 100000,
+        "per_beta_start": 0.4,
+        "replay_buffer_size": 100000,
+        "soft_update_tau": 0.005,
+        "target_update_freq": 10,
+        "use_attention": false
+      },
+      "early_stopping": {
+        "enabled": false,
+        "min_delta": 0,
+        "mode": "max",
+        "patience": 15
+      },
+      "entropy_coef": 0.02,
+      "eval_freq": 1,
+      "gae_lambda": 0.95,
+      "gamma": 0.99,
+      "learning_rate": 0.0005,
+      "log_freq": 1,
+      "max_grad_norm": 0.5,
+      "max_steps_per_episode": 1000,
+      "ppo": {
+        "clip_epsilon": 0.2,
+        "entropy_coef": 0.02,
+        "gae_lambda": 0.95,
+        "max_grad_norm": 0.5,
+        "ppo_epochs": 10,
+        "value_loss_coef": 0.5
+      },
+      "ppo_epochs": 10,
+      "save_freq": 1,
+      "total_episodes": 100,
+      "value_loss_coef": 0.5
+    }
+  },
+  "evaluation_seeds": [
+    101
+  ],
+  "demand_manifest": {
+    "schema_version": 2,
+    "generation_seed": 42,
+    "demand_seconds": 360,
+    "source_route_sha256": "62970b2971788d6021990c10fa4e671e147468ac54d2748649a7d285fb2119f4",
+    "network_sha256": "8f3746e6806672560e0b5e9c2d33cd0923082330f7c99628e674fa93d85cd4d6",
+    "scenarios": [
+      {
+        "name": "light",
+        "multiplier": 0.5,
+        "held_out": false,
+        "cfg_file": "light.sumocfg",
+        "vehicles": 60,
+        "route_sha256": "60eeb22935ed85565ec39c67e5f7705129cc474876e0a81cd68b8379c1ffb11d"
+      },
+      {
+        "name": "normal",
+        "multiplier": 1.0,
+        "held_out": false,
+        "cfg_file": "normal.sumocfg",
+        "vehicles": 120,
+        "route_sha256": "a1dba089b1a22f6601f8030333dcc45f8bfc5b5c30653e191087f68bae7cc054"
+      },
+      {
+        "name": "heavy",
+        "multiplier": 1.5,
+        "held_out": false,
+        "cfg_file": "heavy.sumocfg",
+        "vehicles": 180,
+        "route_sha256": "f3550fe4c9160c43362b061664b7a18cf064c0ce38f6b55fa9f42012e6428ca7"
+      },
+      {
+        "name": "rush_hour",
+        "multiplier": 1.0,
+        "held_out": true,
+        "cfg_file": "rush_hour.sumocfg",
+        "vehicles": 120,
+        "route_sha256": "7c067ee9decda398b9f4672897661f99eb5dffd3ce9e3f350fb546f5ce772f99"
+      }
+    ]
+  },
+  "demand_manifest_sha256": "120bce4964a1231b878b4ad44e4612f3667f422660a16bdbf1efd27fd9f63e61",
+  "models": {
+    "results/tirupati-demo-v1/dqn-42/models/best_model.pth": "0a64453c29e14b74862a3737f59ac28f7a97e6542d218596ac1adb76ee52b56f",
+    "results/tirupati-demo-v1/ppo-42/models/best_model.pth": "b57f0b20816e23cd0e5b2f51b5b7b116107aa2eea942cd4bd52586d5a6780e69"
+  },
+  "provenance": {
+    "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26300-SP0",
+    "packages": {
+      "torch": "2.12.0",
+      "numpy": "2.4.6",
+      "traci": "1.26.0",
+      "gymnasium": "1.3.0",
+      "PyYAML": "6.0.3",
+      "pandas": "3.0.3",
+      "matplotlib": "3.10.9",
+      "fastapi": "0.165.0"
+    },
+    "sumo": "Eclipse SUMO sumo 1.26.0",
+    "git_revision": "0424647e02e3063c775c5a7e00bc354eeb13f09a",
+    "git_status": "M .github/workflows/ci.yml\n M .gitignore\n M README.md\n M config.yaml\n M requirements.txt\n M run_all.bat\n M run_all.ps1\n M scripts/baseline_fixed.py\n M scripts/evaluate.py\n M scripts/evaluate_generalization.py\n M scripts/generate_density_configs.py\n M scripts/generate_report.py\n M scripts/record_video.py\n M scripts/run_experiments.py\n M scripts/train.py\n M src/agents/dqn_agent.py\n M src/agents/ppo_agent.py\n M src/environment/sumo_env.py\n M src/visualization/plot_comparison.py\n M src/visualization/plot_generalization.py\n M src/visualization/plot_signal_timeline.py\n M src/visualization/plot_training.py\n M web/frontend/src/pages/Config.jsx\n M web/frontend/src/pages/Dashboard.jsx\n M web/frontend/src/pages/Demo.jsx\n M web/frontend/src/pages/Experiments.jsx\n M web/frontend/src/pages/Landing.jsx\n M web/server.py\n?? docs/\n?? maps/tirupati/\n?? pytest.ini\n?? scripts/verify_benchmark.py\n?? src/benchmark.py\n?? src/environment/episode_metrics.py\n?? src/environment/timing.py\n?? src/evaluation.py\n?? src/utils/provenance.py\n?? tests/fixtures/\n?? tests/test_benchmark.py\n?? tests/test_episode_semantics.py\n?? tests/test_replay_api.py\n?? tests/test_sumo_integration.py\n?? tests/test_training_semantics.py",
+    "source_hashes": {
+      "src/benchmark.py": "0e6e3a363b0bc3ee1f31f0d0135d307326ada6b34e15896e9d73116e59e18c3b",
+      "src/evaluation.py": "6f7cbc407d4425f6112ce282adcaf44c079099658c9209da03744c878639db9c",
+      "src/__init__.py": "3427c04c8732db7c98ef4f72f0386fddd721a79c036cf3ce98fd2b043034c06b",
+      "src/agents/dqn_agent.py": "b17e35530b75c3047a2b2b8f2535c912600ccbf01d303dd3b00d826bf87f7931",
+      "src/agents/nstep_buffer.py": "69e5d40d5507efc30219d57c690891474a739e9160483027f56c439b5ffdaba1",
+      "src/agents/ppo_agent.py": "69bacf175c48fe1fdc6d4626ab5122f92d56f132e8fcacf86be0e63b2b6189b0",
+      "src/agents/prioritized_replay_buffer.py": "06ac277b007541ab02959442170c5b3128588bcacb7d8b17a6f59769882adfa9",
+      "src/agents/replay_buffer.py": "b3221c5e607dd601ab7bc7eb74883828873fe3b03d6f6fd78a3c9f60ca1b6cec",
+      "src/agents/__init__.py": "a28a44619e57c204f633962352bd9f4c9ed75f89fab84afdcabf83f35440696a",
+      "src/environment/episode_metrics.py": "3053948a9cf0882f8d3338f2ed58a627be238b4fe819a81aefbea23667666ed0",
+      "src/environment/sumo_env.py": "76e51bb9962041d8f2b0dd07e6fcb44982dfc0879bec153fe8ff69f62d3f9b6c",
+      "src/environment/timing.py": "3e646c4446f81fcd8c39873dfdb3044b2fc17f44f626b584d05491c43c3ae8b7",
+      "src/environment/__init__.py": "26e8b70fe2c628a959f8f0616bac552ea91e8e34c677bb8971ba8767fa976c2b",
+      "src/training/curriculum.py": "2d741e9e3b9bb1ba4d7795dc6f651222367d3dae087335a5e894e5fb429454de",
+      "src/training/early_stopping.py": "d5fe9680d37c69058b52c4279af8373df2e431e6fcc03ef43881e89154c24807",
+      "src/training/__init__.py": "bf03876f08b8f84d867f9edfe515a21a0b23620a513d4ec6163ebb0733dbb278",
+      "src/utils/config_validator.py": "1ef1b3e36d26933a491d1f812579fb4cd65cf962426b7c2c722055e7b7802420",
+      "src/utils/logger.py": "633a1c6ef4155097d9dbb6fc5ef176a373f4ad6dbb6b90c4ba42b6a1eda5d0b9",
+      "src/utils/provenance.py": "835756980686b214a8e68eb0bf0d61f918c1cb295f4bf3af7de67f300041e879",
+      "src/utils/wandb_logger.py": "0c1c2db1eb65802359f3d584a9d8625fb82423efa6a324faa29b3c3bf6b6327b",
+      "src/utils/__init__.py": "3e0ba3ae8b30244fc89ce479962c4269a5077e316299b5c39c6547fd17fbb451",
+      "src/visualization/plot_comparison.py": "ef9f053d5247e2ece501f25d70107cfe6241299b593c0d1c8c04d1ef605b2324",
+      "src/visualization/plot_generalization.py": "ef9f053d5247e2ece501f25d70107cfe6241299b593c0d1c8c04d1ef605b2324",
+      "src/visualization/plot_signal_timeline.py": "4d20807e0616405a0699610ddd7bc4c6cfa852cd00d7c30bb273bd44e2294609",
+      "src/visualization/plot_training.py": "48595880987b7daada9fcbd87ccc7d63f75353173a5e9870c44a69032cc51a00",
+      "src/visualization/__init__.py": "0d5892bd62b87c9bfe7dbc813806fcb0de471e1a97f459a8ebd9096037668726",
+      "src/agents/layers/noisy_linear.py": "09add8e70214752fcc5c0498f1ba1a23f54ae73ec79f464035abb36bcca24055",
+      "src/agents/layers/__init__.py": "955a71fc1fe81a19ae07b212405cb61c62f3fc064117d18c30a3fa5f3bd3e34f",
+      "scripts/baseline_fixed.py": "33add2ce65981977d62390bfda8011f1bce087185f7f76452643fe96bddaa875",
+      "scripts/evaluate.py": "8ea90fe9f2a68890597b2096242cfd48c4f48ff16034a7b5166d34a3b3e6ee4a",
+      "scripts/evaluate_generalization.py": "4de308748d2d12f3ac48dfa0a476cd59e32582e31e4df85be432423f64bbdbd4",
+      "scripts/generate_density_configs.py": "c3557fbc5a4f387ff56ea83a679455a78a21d4c8169d714fd37b3e9872b43855",
+      "scripts/generate_report.py": "fc2cadc900c79dea091113d4a03228cc0042527da8772c0e2c93022979d6c321",
+      "scripts/record_video.py": "b6c4a9ddf161d970ad655e6969ca5adf59a3879693a01ab830014b8fad126bcf",
+      "scripts/run_experiments.py": "d0478658e593581e307627564a6e45e5999dba1f3ab3910095d58df2401bb1b3",
+      "scripts/train.py": "b27b74f22548bd51ff1c47062e3068b03a1377848a372cd9dbe45c5560a61067",
+      "scripts/verify_benchmark.py": "698bfdd93881d552be3a1ac530026c251b6cf857d99fd3abbf5dd34739ee3662",
+      "web/server.py": "8f2d07c15e404ea012a7321e7d19ae6729f8594efdab2dff562500d025714227",
+      "web/frontend/postcss.config.js": "190c877db466995bf1482f4a16abd06e04a89ede3119341e2a86ff96e1737b27",
+      "web/frontend/tailwind.config.js": "bffbcd310115650c2f0cc8df2a04ec08123424fb89f3a59d949b89c1da627b2c",
+      "web/frontend/vite.config.js": "f8331efbf59a97c174bd8e5708e17c06bc861fc44e14f5a827660b6ac57dad74",
+      "web/frontend/src/App.jsx": "8751d70cdf49c8b38e2a9d60f9c01727718f3dffef7c7009842eee1d5bea6802",
+      "web/frontend/src/main.jsx": "f6cad6e8b0d58390658f8023b3f598a7a19a112b24fe7a37f95c1dc08b9d902a",
+      "web/frontend/src/components/ErrorBoundary.jsx": "fc48e967a72ecbb9a0e46a525f1171b8388ce0f9e1326d46d9cc51901fd183f8",
+      "web/frontend/src/lib/api.js": "edc24594bf6dbf28e4fa64805093ab03050967ecc06722d22be83906a927adb8",
+      "web/frontend/src/lib/utils.js": "74b0cf54290ee923ec45b3745964928146eba8d30068269d3e78c66774fb7f93",
+      "web/frontend/src/pages/Config.jsx": "94d67008dfff55decf01e19b428374008b724e6dd52878bf33b8ad0322e8df84",
+      "web/frontend/src/pages/Dashboard.jsx": "6c89aa895f72e46da8582867e062aebdd0022c7b0097b1f57ab0dd8e0b5391f3",
+      "web/frontend/src/pages/Demo.jsx": "95aa9f49dc6cae10a327ea595e289183b587db6bbb9c06f8d81991d259994bd8",
+      "web/frontend/src/pages/Experiments.jsx": "6e1b7a1fa8cf98e7bbd74bc6aea6d328e03176a6cfbddcc713e123e1d57ba572",
+      "web/frontend/src/pages/Landing.jsx": "607b7bb08b7621faf62053f6ff28f8640307779b12de1d5e8c94fceb1e200be6"
+    },
+    "source_digest": "0004141cfd57c4686dbf47f9ca96e0b9b609ac78856e79cc01f72fd60d2d9575",
+    "scenario_files": {
+      "maps/tirupati/tirupati.sumocfg": "1cae5d9f8004abb6233eac0649cd27b4b945393b4f99777e045be07339078c12",
+      "maps/tirupati/tirupati.net.xml.gz": "8f3746e6806672560e0b5e9c2d33cd0923082330f7c99628e674fa93d85cd4d6",
+      "maps/tirupati/tirupati.rou.xml": "62970b2971788d6021990c10fa4e671e147468ac54d2748649a7d285fb2119f4"
+    }
+  },
+  "runs": [
+    {
+      "id": "normal-101-fixed-rule",
+      "match_id": "69fc9c6276de7eda461082afceec3be301efd1ee645e8a5a295f1e34a346d2e5",
+      "metrics": {
+        "scheduled_demand": 120,
+        "completed": 117,
+        "unfinished": 3,
+        "uninserted": 0,
+        "completion_fraction": 0.975,
+        "trip_wait_completed_mean_s": 4.111111111111111,
+        "trip_wait_completed_p95_s": 33.799999999999784,
+        "trip_wait_completed_max_s": 59.0,
+        "trip_duration_completed_mean_s": 184.46153846153845,
+        "unfinished_wait_lower_bound_mean_s": 23.0,
+        "seed": 101,
+        "simulated_seconds": 600,
+        "warmup_seconds": 5,
+        "window_begin_s": 5,
+        "window_end_s": 605,
+        "arrivals_network_total": 117,
+        "arrivals_network_window": 117,
+        "departures_network_total": 120,
+        "network_stopped_vehicle_seconds": 668,
+        "controlled_lane_queue_mean": 0.8533333333333334,
+        "policy": "fixed",
+        "match_id": "69fc9c6276de7eda461082afceec3be301efd1ee645e8a5a295f1e34a346d2e5",
+        "runtime_seconds": 26.599642400047742,
+        "scenario": "normal",
+        "training_seed": ""
+      },
+      "tripinfo": "normal-101-fixed-rule.tripinfo.xml",
+      "replay": "normal-101-fixed-rule.replay.json",
+      "checkpoint": null,
+      "scenario_files": {
+        "results/tirupati-demo-v1/demand/normal.sumocfg": "e65e0084459fad5ee78c14f0ffa3b8570face08240013379a2dc0b25657b07ed",
+        "results/tirupati-demo-v1/demand/network.net.xml.gz": "8f3746e6806672560e0b5e9c2d33cd0923082330f7c99628e674fa93d85cd4d6",
+        "results/tirupati-demo-v1/demand/normal.rou.xml": "a1dba089b1a22f6601f8030333dcc45f8bfc5b5c30653e191087f68bae7cc054"
+      }
+    },
+    {
+      "id": "normal-101-actuated-rule",
+      "match_id": "69fc9c6276de7eda461082afceec3be301efd1ee645e8a5a295f1e34a346d2e5",
+      "metrics": {
+        "scheduled_demand": 120,
+        "completed": 118,
+        "unfinished": 2,
+        "uninserted": 0,
+        "completion_fraction": 0.9833333333333333,
+        "trip_wait_completed_mean_s": 1.0423728813559323,
+        "trip_wait_completed_p95_s": 9.149999999999991,
+        "trip_wait_completed_max_s": 15.0,
+        "trip_duration_completed_mean_s": 181.61864406779662,
+        "unfinished_wait_lower_bound_mean_s": 0.0,
+        "seed": 101,
+        "simulated_seconds": 600,
+        "warmup_seconds": 5,
+        "window_begin_s": 5,
+        "window_end_s": 605,
+        "arrivals_network_total": 118,
+        "arrivals_network_window": 118,
+        "departures_network_total": 120,
+        "network_stopped_vehicle_seconds": 241,
+        "controlled_lane_queue_mean": 0.15333333333333332,
+        "policy": "actuated",
+        "match_id": "69fc9c6276de7eda461082afceec3be301efd1ee645e8a5a295f1e34a346d2e5",
+        "runtime_seconds": 26.74422480002977,
+        "scenario": "normal",
+        "training_seed": ""
+      },
+      "tripinfo": "normal-101-actuated-rule.tripinfo.xml",
+      "replay": "normal-101-actuated-rule.replay.json",
+      "checkpoint": null,
+      "scenario_files": {
+        "results/tirupati-demo-v1/demand/normal.sumocfg": "e65e0084459fad5ee78c14f0ffa3b8570face08240013379a2dc0b25657b07ed",
+        "results/tirupati-demo-v1/demand/network.net.xml.gz": "8f3746e6806672560e0b5e9c2d33cd0923082330f7c99628e674fa93d85cd4d6",
+        "results/tirupati-demo-v1/demand/normal.rou.xml": "a1dba089b1a22f6601f8030333dcc45f8bfc5b5c30653e191087f68bae7cc054"
+      }
+    },
+    {
+      "id": "normal-101-dqn-42",
+      "match_id": "69fc9c6276de7eda461082afceec3be301efd1ee645e8a5a295f1e34a346d2e5",
+      "metrics": {
+        "scheduled_demand": 120,
+        "completed": 118,
+        "unfinished": 2,
+        "uninserted": 0,
+        "completion_fraction": 0.9833333333333333,
+        "trip_wait_completed_mean_s": 1.2372881355932204,
+        "trip_wait_completed_p95_s": 10.449999999999974,
+        "trip_wait_completed_max_s": 19.0,
+        "trip_duration_completed_mean_s": 181.77118644067798,
+        "unfinished_wait_lower_bound_mean_s": 0.0,
+        "seed": 101,
+        "simulated_seconds": 600,
+        "warmup_seconds": 5,
+        "window_begin_s": 5,
+        "window_end_s": 605,
+        "arrivals_network_total": 118,
+        "arrivals_network_window": 118,
+        "departures_network_total": 120,
+        "network_stopped_vehicle_seconds": 264,
+        "controlled_lane_queue_mean": 0.18666666666666668,
+        "policy": "dqn",
+        "match_id": "69fc9c6276de7eda461082afceec3be301efd1ee645e8a5a295f1e34a346d2e5",
+        "runtime_seconds": 25.179279799980577,
+        "scenario": "normal",
+        "training_seed": 42
+      },
+      "tripinfo": "normal-101-dqn-42.tripinfo.xml",
+      "replay": "normal-101-dqn-42.replay.json",
+      "checkpoint": {
+        "schema_verified": true,
+        "sha256": "0a64453c29e14b74862a3737f59ac28f7a97e6542d218596ac1adb76ee52b56f",
+        "metadata": {
+          "algorithm": "dqn",
+          "episode": 2,
+          "training_seed": 42,
+          "validation_metric": "network_stopped_vehicle_seconds",
+          "validation_score": 95.0,
+          "config": {
+            "density_variants": {
+              "multipliers": [
+                0.25,
+                0.5,
+                0.6,
+                0.7,
+                0.8,
+                0.9,
+                1,
+                1.1,
+                1.2,
+                1.3,
+                1.5,
+                1.75,
+                2
+              ]
+            },
+            "environment": {
+              "add_per_agent_info": true,
+              "add_system_info": true,
+              "normalize_observations": true,
+              "observation_type": "default",
+              "reward_type": "custom-shaped",
+              "reward_weights": {
+                "congestion_penalty": 0.1,
+                "congestion_threshold": 0.8,
+                "emergency_weight": 0.2,
+                "queue_weight": 0.4,
+                "switch_penalty": 0.01,
+                "incoming_count_decrease_bonus": 0.05,
+                "waiting_time_weight": 0.4
+              }
+            },
+            "evaluation": {
+              "num_episodes": 5,
+              "save_video": false,
+              "video_dir": "results/videos",
+              "video_fps": 10
+            },
+            "experiment": {
+              "device": "cpu",
+              "log_dir": "results",
+              "name": "multi_agent_traffic_dqn",
+              "seed": 42
+            },
+            "sumo": {
+              "begin_time": 0,
+              "cfg_file": "results/tirupati-demo-v1/demand/normal.sumocfg",
+              "delta_time": 5,
+              "density_multiplier": 1,
+              "max_green": 50,
+              "min_green": 5,
+              "num_seconds": 300,
+              "warmup_seconds": 5,
+              "all_red_time": 1,
+              "terminate_when_empty": false,
+              "use_gui": false,
+              "yellow_time": 3
+            },
+            "training": {
+              "algorithm": "dqn",
+              "batch_size": 64,
+              "clip_epsilon": 0.2,
+              "dqn": {
+                "double_dqn": true,
+                "dueling": true,
+                "epsilon_decay": 0.995,
+                "epsilon_end": 0.01,
+                "epsilon_start": 1,
+                "grad_clip": 10,
+                "hidden_dims": [
+                  256,
+                  256,
+                  128
+                ],
+                "learning_rate": 0.0005,
+                "lr_scheduler": "cosine",
+                "lr_scheduler_total_steps": 100000,
+                "lr_scheduler_eta_min": 1e-06,
+                "lr_scheduler_gamma": 0.95,
+                "lr_scheduler_step_size": 1000,
+                "n_step": 1,
+                "noisy_net": false,
+                "noisy_sigma": 0.5,
+                "num_agents": 0,
+                "num_lane_features": 5,
+                "num_lanes": 0,
+                "per": false,
+                "per_alpha": 0.6,
+                "per_beta_frames": 100000,
+                "per_beta_start": 0.4,
+                "replay_buffer_size": 100000,
+                "soft_update_tau": 0.005,
+                "target_update_freq": 10,
+                "use_attention": false
+              },
+              "early_stopping": {
+                "enabled": false,
+                "min_delta": 0,
+                "mode": "max",
+                "patience": 15
+              },
+              "entropy_coef": 0.02,
+              "eval_freq": 1,
+              "gae_lambda": 0.95,
+              "gamma": 0.99,
+              "learning_rate": 0.0005,
+              "log_freq": 1,
+              "max_grad_norm": 0.5,
+              "max_steps_per_episode": 1000,
+              "ppo": {
+                "clip_epsilon": 0.2,
+                "entropy_coef": 0.02,
+                "gae_lambda": 0.95,
+                "max_grad_norm": 0.5,
+                "ppo_epochs": 10,
+                "value_loss_coef": 0.5
+              },
+              "ppo_epochs": 10,
+              "save_freq": 1,
+              "total_episodes": 2,
+              "value_loss_coef": 0.5
+            },
+            "validation": {
+              "scenarios": [
+                "results/tirupati-demo-v1/demand/light.sumocfg"
+              ],
+              "seeds": [
+                7001
+              ]
+            }
+          },
+          "source_digest": "923b1a47321a6f8dac02c1695deec6c213a85708aa80576f332c667f02c301a7",
+          "observation_schema": {
+            "version": 2,
+            "signals": [
+              "2850931797",
+              "2851041026",
+              "cluster_2847858490_2847858491",
+              "cluster_2850931710_2850931716",
+              "cluster_2850931751_3430481170",
+              "cluster_2851327786_2851327792",
+              "cluster_2851329259_7666634305",
+              "cluster_2851329532_2851329539_3109384253",
+              "cluster_2851329560_7670767531",
+              "cluster_5156781911_5156781912_7668846231"
+            ],
+            "lanes_by_signal": {
+              "2850931797": [
+                "-281078753_0",
+                "-281078877#0_0",
+                "-281078953#0_0",
+                "-821458851#0_0",
+                "281078956_0",
+                "996571154_0"
+              ],
+              "2851041026": [
+                "-281098442#4_0",
+                "-823812179_0",
+                "-996572781#0_0",
+                "281098442#3_0",
+                "281098462_0"
+              ],
+              "cluster_2847858490_2847858491": [
+                "-280725337#12_0",
+                "-280725371#3_0",
+                "280725337#10_0",
+                "280725337#22_0",
+                "280725371#2_0"
+              ],
+              "cluster_2850931710_2850931716": [
+                "281078777_0",
+                "281078886#1_0",
+                "281078943#1_0",
+                "281078951#1_0",
+                "281078973#1_0"
+              ],
+              "cluster_2850931751_3430481170": [
+                "-280719024#2_0",
+                "-281079007#0_0",
+                "-996571151_0",
+                "280719024#0_0",
+                "821458888_0"
+              ],
+              "cluster_2851327786_2851327792": [
+                "-281137121#4_0",
+                "-281137311#0_0",
+                "1107291673_0",
+                "281137121#2_0",
+                "815149748#1_0"
+              ],
+              "cluster_2851329259_7666634305": [
+                "-281137234#2_0",
+                "-281137302#4_0",
+                "-821091831_0",
+                "281137234#0_0",
+                "281137302#3_0"
+              ],
+              "cluster_2851329532_2851329539_3109384253": [
+                "-281137296#1_0",
+                "-306120159#3_0",
+                "-821485704_0",
+                "306120159#1_0",
+                "996545746_0"
+              ],
+              "cluster_2851329560_7670767531": [
+                "-281137255#2_0",
+                "-281137292#2_0",
+                "281137255#1_0",
+                "281137292#0_0",
+                "281137296#2_0"
+              ],
+              "cluster_5156781911_5156781912_7668846231": [
+                "-531213256#3_0",
+                "-531436546#32_0",
+                "-821458882_0",
+                "531213256#1_0",
+                "531436546#30_0"
+              ]
+            },
+            "green_states_by_signal": {
+              "2850931797": [
+                "rrrrrrrrrrGGGGGGrrrrrrrrrrrrrr",
+                "GGGggrrrrrrrrrrGGGggrrrrrrrrrr",
+                "GrrrrrrrrrrrrrrrrrrrrrrrrGGGGG",
+                "rrrrrrrrrrrrrrrrrrrrGGGGGGrrrr",
+                "rrrrrGGGGGGrrrrrrrrrrrrrrrrrrr"
+              ],
+              "2851041026": [
+                "rrrrGGGgrrrrGGggrrrr",
+                "rrrrrrrrGGGgrrrrGGgg",
+                "GGGGGrrrrrrrrrrrrrrr"
+              ],
+              "cluster_2847858490_2847858491": [
+                "rrrrrrrrGGGgrrrrGGgg",
+                "GGggrrrrrrrrGGGgrrrr",
+                "rrrrGGGGGrrrrrrrrrrr"
+              ],
+              "cluster_2850931710_2850931716": [
+                "GGggrrrrrrrrGGGgrrrr",
+                "rrrrrrrrGGGgrrrrGGgg",
+                "rrrrGGGGGrrrrrrrrrrr"
+              ],
+              "cluster_2850931751_3430481170": [
+                "rrrrGGGgrrrrGGggrrrr",
+                "rrrrrrrrGGGgrrrrGGgg",
+                "GGGGGrrrrrrrrrrrrrrr"
+              ],
+              "cluster_2851327786_2851327792": [
+                "GGGgrrrrGGggrrrrrrrr",
+                "rrrrGGggrrrrrrrrggGg",
+                "rrrrrrrrrrrrGGGGGrrr"
+              ],
+              "cluster_2851329259_7666634305": [
+                "GGggrrrrrrrrGGGgrrrr",
+                "rrrrGGggrrrrrrrrGGGg",
+                "rrrrrrrrGGGGGrrrrrrr"
+              ],
+              "cluster_2851329532_2851329539_3109384253": [
+                "rrrrgGggrrrrrrrrGGGg",
+                "rrrrgrGGrrrrrrrrrrrG",
+                "GGggrrrrrrrrGGGgrrrr",
+                "rrGGrrrrrrrrrrrGrrrr",
+                "rrrrrrrrGGGGGrrrrrrr"
+              ],
+              "cluster_2851329560_7670767531": [
+                "rrrrGGggrrrrrrrrGGGg",
+                "GGGgrrrrGGggrrrrrrrr",
+                "rrrrrrrrrrrrGGGGGrrr"
+              ],
+              "cluster_5156781911_5156781912_7668846231": [
+                "rrrrGGGgrrrrGGggrrrr",
+                "GGGgrrrrGGggrrrrrrrr",
+                "GrrrrrrrrrrrrrrrGGGG"
+              ]
+            },
+            "lane_features": [
+              "queue/20",
+              "speed/15",
+              "lane_wait_snapshot/100",
+              "density/0.5",
+              "count/30"
+            ],
+            "normalization": {
+              "queue": 20,
+              "speed": 15,
+              "lane_wait_snapshot": 100,
+              "density": 0.5,
+              "count": 30,
+              "green_elapsed": 50
+            },
+            "padding": "zeros to max_lanes; green phase onehot to max_phases",
+            "elapsed": "green_elapsed_seconds/max_green, clipped at 1",
+            "max_lanes": 6,
+            "max_phases": 5,
+            "action_schema": "0 hold, 1 request next cyclic green; safety constraints may override"
+          },
+          "checkpoint_sha256": "0a64453c29e14b74862a3737f59ac28f7a97e6542d218596ac1adb76ee52b56f"
+        }
+      },
+      "scenario_files": {
+        "results/tirupati-demo-v1/demand/normal.sumocfg": "e65e0084459fad5ee78c14f0ffa3b8570face08240013379a2dc0b25657b07ed",
+        "results/tirupati-demo-v1/demand/network.net.xml.gz": "8f3746e6806672560e0b5e9c2d33cd0923082330f7c99628e674fa93d85cd4d6",
+        "results/tirupati-demo-v1/demand/normal.rou.xml": "a1dba089b1a22f6601f8030333dcc45f8bfc5b5c30653e191087f68bae7cc054"
+      }
+    },
+    {
+      "id": "normal-101-ppo-42",
+      "match_id": "69fc9c6276de7eda461082afceec3be301efd1ee645e8a5a295f1e34a346d2e5",
+      "metrics": {
+        "scheduled_demand": 120,
+        "completed": 118,
+        "unfinished": 2,
+        "uninserted": 0,
+        "completion_fraction": 0.9833333333333333,
+        "trip_wait_completed_mean_s": 1.61864406779661,
+        "trip_wait_completed_p95_s": 10.149999999999991,
+        "trip_wait_completed_max_s": 19.0,
+        "trip_duration_completed_mean_s": 182.24576271186442,
+        "unfinished_wait_lower_bound_mean_s": 9.5,
+        "seed": 101,
+        "simulated_seconds": 600,
+        "warmup_seconds": 5,
+        "window_begin_s": 5,
+        "window_end_s": 605,
+        "arrivals_network_total": 118,
+        "arrivals_network_window": 118,
+        "departures_network_total": 120,
+        "network_stopped_vehicle_seconds": 328,
+        "controlled_lane_queue_mean": 0.28833333333333333,
+        "policy": "ppo",
+        "match_id": "69fc9c6276de7eda461082afceec3be301efd1ee645e8a5a295f1e34a346d2e5",
+        "runtime_seconds": 20.26442490000045,
+        "scenario": "normal",
+        "training_seed": 42
+      },
+      "tripinfo": "normal-101-ppo-42.tripinfo.xml",
+      "replay": "normal-101-ppo-42.replay.json",
+      "checkpoint": {
+        "schema_verified": true,
+        "sha256": "b57f0b20816e23cd0e5b2f51b5b7b116107aa2eea942cd4bd52586d5a6780e69",
+        "metadata": {
+          "algorithm": "ppo",
+          "episode": 2,
+          "training_seed": 42,
+          "validation_metric": "network_stopped_vehicle_seconds",
+          "validation_score": 106.0,
+          "config": {
+            "density_variants": {
+              "multipliers": [
+                0.25,
+                0.5,
+                0.6,
+                0.7,
+                0.8,
+                0.9,
+                1,
+                1.1,
+                1.2,
+                1.3,
+                1.5,
+                1.75,
+                2
+              ]
+            },
+            "environment": {
+              "add_per_agent_info": true,
+              "add_system_info": true,
+              "normalize_observations": true,
+              "observation_type": "default",
+              "reward_type": "custom-shaped",
+              "reward_weights": {
+                "congestion_penalty": 0.1,
+                "congestion_threshold": 0.8,
+                "emergency_weight": 0.2,
+                "queue_weight": 0.4,
+                "switch_penalty": 0.01,
+                "incoming_count_decrease_bonus": 0.05,
+                "waiting_time_weight": 0.4
+              }
+            },
+            "evaluation": {
+              "num_episodes": 5,
+              "save_video": false,
+              "video_dir": "results/videos",
+              "video_fps": 10
+            },
+            "experiment": {
+              "device": "cpu",
+              "log_dir": "results",
+              "name": "multi_agent_traffic_dqn",
+              "seed": 42
+            },
+            "sumo": {
+              "begin_time": 0,
+              "cfg_file": "results/tirupati-demo-v1/demand/normal.sumocfg",
+              "delta_time": 5,
+              "density_multiplier": 1,
+              "max_green": 50,
+              "min_green": 5,
+              "num_seconds": 300,
+              "warmup_seconds": 5,
+              "all_red_time": 1,
+              "terminate_when_empty": false,
+              "use_gui": false,
+              "yellow_time": 3
+            },
+            "training": {
+              "algorithm": "ppo",
+              "batch_size": 64,
+              "clip_epsilon": 0.2,
+              "dqn": {
+                "double_dqn": true,
+                "dueling": true,
+                "epsilon_decay": 0.995,
+                "epsilon_end": 0.01,
+                "epsilon_start": 1,
+                "grad_clip": 10,
+                "hidden_dims": [
+                  256,
+                  256,
+                  128
+                ],
+                "learning_rate": 0.0005,
+                "lr_scheduler": "cosine",
+                "lr_scheduler_total_steps": 100000,
+                "lr_scheduler_eta_min": 1e-06,
+                "lr_scheduler_gamma": 0.95,
+                "lr_scheduler_step_size": 1000,
+                "n_step": 1,
+                "noisy_net": false,
+                "noisy_sigma": 0.5,
+                "num_agents": 0,
+                "num_lane_features": 5,
+                "num_lanes": 0,
+                "per": false,
+                "per_alpha": 0.6,
+                "per_beta_frames": 100000,
+                "per_beta_start": 0.4,
+                "replay_buffer_size": 100000,
+                "soft_update_tau": 0.005,
+                "target_update_freq": 10,
+                "use_attention": false
+              },
+              "early_stopping": {
+                "enabled": false,
+                "min_delta": 0,
+                "mode": "max",
+                "patience": 15
+              },
+              "entropy_coef": 0.02,
+              "eval_freq": 1,
+              "gae_lambda": 0.95,
+              "gamma": 0.99,
+              "learning_rate": 0.0005,
+              "log_freq": 1,
+              "max_grad_norm": 0.5,
+              "max_steps_per_episode": 1000,
+              "ppo": {
+                "clip_epsilon": 0.2,
+                "entropy_coef": 0.02,
+                "gae_lambda": 0.95,
+                "max_grad_norm": 0.5,
+                "ppo_epochs": 10,
+                "value_loss_coef": 0.5
+              },
+              "ppo_epochs": 10,
+              "save_freq": 1,
+              "total_episodes": 2,
+              "value_loss_coef": 0.5
+            },
+            "validation": {
+              "scenarios": [
+                "results/tirupati-demo-v1/demand/light.sumocfg"
+              ],
+              "seeds": [
+                7001
+              ]
+            }
+          },
+          "source_digest": "0004141cfd57c4686dbf47f9ca96e0b9b609ac78856e79cc01f72fd60d2d9575",
+          "observation_schema": {
+            "version": 2,
+            "signals": [
+              "2850931797",
+              "2851041026",
+              "cluster_2847858490_2847858491",
+              "cluster_2850931710_2850931716",
+              "cluster_2850931751_3430481170",
+              "cluster_2851327786_2851327792",
+              "cluster_2851329259_7666634305",
+              "cluster_2851329532_2851329539_3109384253",
+              "cluster_2851329560_7670767531",
+              "cluster_5156781911_5156781912_7668846231"
+            ],
+            "lanes_by_signal": {
+              "2850931797": [
+                "-281078753_0",
+                "-281078877#0_0",
+                "-281078953#0_0",
+                "-821458851#0_0",
+                "281078956_0",
+                "996571154_0"
+              ],
+              "2851041026": [
+                "-281098442#4_0",
+                "-823812179_0",
+                "-996572781#0_0",
+                "281098442#3_0",
+                "281098462_0"
+              ],
+              "cluster_2847858490_2847858491": [
+                "-280725337#12_0",
+                "-280725371#3_0",
+                "280725337#10_0",
+                "280725337#22_0",
+                "280725371#2_0"
+              ],
+              "cluster_2850931710_2850931716": [
+                "281078777_0",
+                "281078886#1_0",
+                "281078943#1_0",
+                "281078951#1_0",
+                "281078973#1_0"
+              ],
+              "cluster_2850931751_3430481170": [
+                "-280719024#2_0",
+                "-281079007#0_0",
+                "-996571151_0",
+                "280719024#0_0",
+                "821458888_0"
+              ],
+              "cluster_2851327786_2851327792": [
+                "-281137121#4_0",
+                "-281137311#0_0",
+                "1107291673_0",
+                "281137121#2_0",
+                "815149748#1_0"
+              ],
+              "cluster_2851329259_7666634305": [
+                "-281137234#2_0",
+                "-281137302#4_0",
+                "-821091831_0",
+                "281137234#0_0",
+                "281137302#3_0"
+              ],
+              "cluster_2851329532_2851329539_3109384253": [
+                "-281137296#1_0",
+                "-306120159#3_0",
+                "-821485704_0",
+                "306120159#1_0",
+                "996545746_0"
+              ],
+              "cluster_2851329560_7670767531": [
+                "-281137255#2_0",
+                "-281137292#2_0",
+                "281137255#1_0",
+                "281137292#0_0",
+                "281137296#2_0"
+              ],
+              "cluster_5156781911_5156781912_7668846231": [
+                "-531213256#3_0",
+                "-531436546#32_0",
+                "-821458882_0",
+                "531213256#1_0",
+                "531436546#30_0"
+              ]
+            },
+            "green_states_by_signal": {
+              "2850931797": [
+                "rrrrrrrrrrGGGGGGrrrrrrrrrrrrrr",
+                "GGGggrrrrrrrrrrGGGggrrrrrrrrrr",
+                "GrrrrrrrrrrrrrrrrrrrrrrrrGGGGG",
+                "rrrrrrrrrrrrrrrrrrrrGGGGGGrrrr",
+                "rrrrrGGGGGGrrrrrrrrrrrrrrrrrrr"
+              ],
+              "2851041026": [
+                "rrrrGGGgrrrrGGggrrrr",
+                "rrrrrrrrGGGgrrrrGGgg",
+                "GGGGGrrrrrrrrrrrrrrr"
+              ],
+              "cluster_2847858490_2847858491": [
+                "rrrrrrrrGGGgrrrrGGgg",
+                "GGggrrrrrrrrGGGgrrrr",
+                "rrrrGGGGGrrrrrrrrrrr"
+              ],
+              "cluster_2850931710_2850931716": [
+                "GGggrrrrrrrrGGGgrrrr",
+                "rrrrrrrrGGGgrrrrGGgg",
+                "rrrrGGGGGrrrrrrrrrrr"
+              ],
+              "cluster_2850931751_3430481170": [
+                "rrrrGGGgrrrrGGggrrrr",
+                "rrrrrrrrGGGgrrrrGGgg",
+                "GGGGGrrrrrrrrrrrrrrr"
+              ],
+              "cluster_2851327786_2851327792": [
+                "GGGgrrrrGGggrrrrrrrr",
+                "rrrrGGggrrrrrrrrggGg",
+                "rrrrrrrrrrrrGGGGGrrr"
+              ],
+              "cluster_2851329259_7666634305": [
+                "GGggrrrrrrrrGGGgrrrr",
+                "rrrrGGggrrrrrrrrGGGg",
+                "rrrrrrrrGGGGGrrrrrrr"
+              ],
+              "cluster_2851329532_2851329539_3109384253": [
+                "rrrrgGggrrrrrrrrGGGg",
+                "rrrrgrGGrrrrrrrrrrrG",
+                "GGggrrrrrrrrGGGgrrrr",
+                "rrGGrrrrrrrrrrrGrrrr",
+                "rrrrrrrrGGGGGrrrrrrr"
+              ],
+              "cluster_2851329560_7670767531": [
+                "rrrrGGggrrrrrrrrGGGg",
+                "GGGgrrrrGGggrrrrrrrr",
+                "rrrrrrrrrrrrGGGGGrrr"
+              ],
+              "cluster_5156781911_5156781912_7668846231": [
+                "rrrrGGGgrrrrGGggrrrr",
+                "GGGgrrrrGGggrrrrrrrr",
+                "GrrrrrrrrrrrrrrrGGGG"
+              ]
+            },
+            "lane_features": [
+              "queue/20",
+              "speed/15",
+              "lane_wait_snapshot/100",
+              "density/0.5",
+              "count/30"
+            ],
+            "normalization": {
+              "queue": 20,
+              "speed": 15,
+              "lane_wait_snapshot": 100,
+              "density": 0.5,
+              "count": 30,
+              "green_elapsed": 50
+            },
+            "padding": "zeros to max_lanes; green phase onehot to max_phases",
+            "elapsed": "green_elapsed_seconds/max_green, clipped at 1",
+            "max_lanes": 6,
+            "max_phases": 5,
+            "action_schema": "0 hold, 1 request next cyclic green; safety constraints may override"
+          },
+          "checkpoint_sha256": "b57f0b20816e23cd0e5b2f51b5b7b116107aa2eea942cd4bd52586d5a6780e69"
+        }
+      },
+      "scenario_files": {
+        "results/tirupati-demo-v1/demand/normal.sumocfg": "e65e0084459fad5ee78c14f0ffa3b8570face08240013379a2dc0b25657b07ed",
+        "results/tirupati-demo-v1/demand/network.net.xml.gz": "8f3746e6806672560e0b5e9c2d33cd0923082330f7c99628e674fa93d85cd4d6",
+        "results/tirupati-demo-v1/demand/normal.rou.xml": "a1dba089b1a22f6601f8030333dcc45f8bfc5b5c30653e191087f68bae7cc054"
+      }
+    }
+  ],
+  "limitations": [
+    "Pilot or finite training budget; convergence is not established.",
+    "Intervals resample matched evaluation seeds within each training seed; they do not estimate training-seed population uncertainty.",
+    "Completed-only TripInfo waiting/travel times exclude censored unfinished and uninserted trips; inspect completion before comparing them.",
+    "Controlled-lane queue is an incoming-lane snapshot metric, not a whole-network queue or a trip mean.",
+    "Shaped rewards use incoming-count and lane-wait proxies, not movement pressure or measured intersection throughput.",
+    "Derived common plans yellow all released greens and insert all-red. Fixed is this bounded derived plan, not the unmodified source program.",
+    "Simulation demand and signal plans have no field calibration."
+  ],
+  "raw_csv_sha256": "8721009ed18ad39cd3fd8c7ee49672363d53818e6a8fce8196a73ad7a6cde924"
+}

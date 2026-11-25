@@ -30,10 +30,13 @@ def plot_training(
     with open(metrics_path, "r") as f:
         data = json.load(f)
 
+    if not data:
+        raise ValueError('No training episodes to plot')
     episodes = [d["episode"] for d in data]
+    legacy = 'avg_waiting_time' in data[0]
     rewards = [d["reward"] for d in data]
-    avg_waiting = [d.get("avg_waiting_time", 0) for d in data]
-    avg_queue = [d.get("avg_queue", 0) for d in data]
+    avg_waiting = [d.get("avg_waiting_time", np.nan) if legacy else d.get("trip_wait_completed_mean_s", np.nan) for d in data]
+    avg_queue = [d.get("avg_queue", np.nan) if legacy else d.get("controlled_lane_queue_mean", np.nan) for d in data]
     epsilons = [d.get("epsilon", None) for d in data]
 
     fig_style = {"figure.figsize": (10, 6), "axes.grid": True, "grid.alpha": 0.3}
@@ -66,8 +69,8 @@ def plot_training(
         ax.plot(episodes[window - 1:], smoothed, color="#E65100", linewidth=2.5, label="Smoothed")
         ax.legend()
     ax.set_xlabel("Episode")
-    ax.set_ylabel("Avg Waiting Time (s)")
-    ax.set_title("Average Waiting Time Over Training")
+    ax.set_ylabel("Controlled-lane waiting snapshot sum (veh-s)" if legacy else "Completed-trip mean wait (s)")
+    ax.set_title("Legacy lane snapshot proxy" if legacy else "Completed-trip waiting (censored trips excluded)")
     fig.tight_layout()
     fig.savefig(os.path.join(output_dir, "training_waiting_time.png"), dpi=150)
     if show:
@@ -83,8 +86,8 @@ def plot_training(
         ax.plot(episodes[window - 1:], smoothed, color="#1B5E20", linewidth=2.5, label="Smoothed")
         ax.legend()
     ax.set_xlabel("Episode")
-    ax.set_ylabel("Avg Queue Length")
-    ax.set_title("Average Queue Length Over Training")
+    ax.set_ylabel("Mean controlled incoming-lane queue (vehicles)")
+    ax.set_title("Controlled incoming-lane queue over training")
     fig.tight_layout()
     fig.savefig(os.path.join(output_dir, "training_queue.png"), dpi=150)
     if show:

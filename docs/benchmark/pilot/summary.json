@@ -1,0 +1,352 @@
+{
+  "schema_version": 2,
+  "primary_metric": "network_stopped_vehicle_seconds",
+  "uncertainty": "95% percentile bootstrap of paired mean differences, 10000 resamples, seed 42; evaluation seeds only",
+  "groups": [
+    {
+      "scenario": "heavy",
+      "policy": "actuated",
+      "training_seed": "",
+      "runs": 5,
+      "paired_n": 5,
+      "missing_matches": [],
+      "means": {
+        "network_stopped_vehicle_seconds": 7324.2,
+        "controlled_lane_queue_mean": 13.577333333333334,
+        "completion_fraction": 0.22567567567567565,
+        "completed": 100.2,
+        "unfinished": 338.4,
+        "uninserted": 5.4,
+        "trip_wait_completed_mean_s": 8.397639526331274,
+        "trip_wait_completed_p95_s": 35.79999999999998,
+        "trip_wait_completed_max_s": 79.6,
+        "trip_duration_completed_mean_s": 131.85377213886437,
+        "unfinished_wait_lower_bound_mean_s": 17.876402093389018,
+        "runtime_seconds": 18.712728999998944
+      },
+      "paired_difference_stopped_vehicle_seconds": -559.8,
+      "paired_bootstrap_95_ci": [
+        -1220.6,
+        101.0
+      ],
+      "improvement_pct": 7.100456621004565
+    },
+    {
+      "scenario": "heavy",
+      "policy": "dqn",
+      "training_seed": "42",
+      "runs": 5,
+      "paired_n": 5,
+      "missing_matches": [],
+      "means": {
+        "network_stopped_vehicle_seconds": 7837.0,
+        "controlled_lane_queue_mean": 13.238,
+        "completion_fraction": 0.227027027027027,
+        "completed": 100.8,
+        "unfinished": 336.2,
+        "uninserted": 7.0,
+        "trip_wait_completed_mean_s": 8.51310789584113,
+        "trip_wait_completed_p95_s": 49.99999999999995,
+        "trip_wait_completed_max_s": 90.0,
+        "trip_duration_completed_mean_s": 129.76768612946296,
+        "unfinished_wait_lower_bound_mean_s": 19.46099749074059,
+        "runtime_seconds": 18.30357687999931
+      },
+      "paired_difference_stopped_vehicle_seconds": -47.0,
+      "paired_bootstrap_95_ci": [
+        -1179.2,
+        1096.2
+      ],
+      "improvement_pct": 0.5961440892947742
+    },
+    {
+      "scenario": "heavy",
+      "policy": "fixed",
+      "training_seed": "",
+      "runs": 5,
+      "paired_n": 5,
+      "missing_matches": [],
+      "means": {
+        "network_stopped_vehicle_seconds": 7884.0,
+        "controlled_lane_queue_mean": 11.854,
+        "completion_fraction": 0.218018018018018,
+        "completed": 96.8,
+        "unfinished": 340.2,
+        "uninserted": 7.0,
+        "trip_wait_completed_mean_s": 8.893209556924496,
+        "trip_wait_completed_p95_s": 58.00999999999999,
+        "trip_wait_completed_max_s": 84.2,
+        "trip_duration_completed_mean_s": 125.80125936335284,
+        "unfinished_wait_lower_bound_mean_s": 19.3647131724311,
+        "runtime_seconds": 18.390093040000647
+      },
+      "paired_difference_stopped_vehicle_seconds": 0.0,
+      "paired_bootstrap_95_ci": [
+        0.0,
+        0.0
+      ],
+      "improvement_pct": -0.0
+    },
+    {
+      "scenario": "heavy",
+      "policy": "ppo",
+      "training_seed": "42",
+      "runs": 5,
+      "paired_n": 5,
+      "missing_matches": [],
+      "means": {
+        "network_stopped_vehicle_seconds": 7581.4,
+        "controlled_lane_queue_mean": 14.065999999999999,
+        "completion_fraction": 0.22342342342342345,
+        "completed": 99.2,
+        "unfinished": 338.8,
+        "uninserted": 6.0,
+        "trip_wait_completed_mean_s": 7.264815414431527,
+        "trip_wait_completed_p95_s": 31.93999999999996,
+        "trip_wait_completed_max_s": 89.8,
+        "trip_duration_completed_mean_s": 129.30666928914863,
+        "unfinished_wait_lower_bound_mean_s": 18.947961831016638,
+        "runtime_seconds": 17.4800796800002
+      },
+      "paired_difference_stopped_vehicle_seconds": -302.6,
+      "paired_bootstrap_95_ci": [
+        -1620.4,
+        911.2
+      ],
+      "improvement_pct": 3.8381532217148657
+    },
+    {
+      "scenario": "light",
+      "policy": "actuated",
+      "training_seed": "",
+      "runs": 5,
+      "paired_n": 5,
+      "missing_matches": [],
+      "means": {
+        "network_stopped_vehicle_seconds": 2430.4,
+        "controlled_lane_queue_mean": 6.022,
+        "completion_fraction": 0.2635135135135135,
+        "completed": 39.0,
+        "unfinished": 109.0,
+        "uninserted": 0.0,
+        "trip_wait_completed_mean_s": 7.400211365211365,
+        "trip_wait_completed_p95_s": 34.66999999999996,
+        "trip_wait_completed_max_s": 67.6,
+        "trip_duration_completed_mean_s": 132.94118156618157,
+        "unfinished_wait_lower_bound_mean_s": 18.300251168599793,
+        "runtime_seconds": 14.092123899998843
+      },
+      "paired_difference_stopped_vehicle_seconds": -608.4,
+      "paired_bootstrap_95_ci": [
+        -689.2,
+        -527.6
+      ],
+      "improvement_pct": 20.02106094510991
+    },
+    {
+      "scenario": "light",
+      "policy": "dqn",
+      "training_seed": "42",
+      "runs": 5,
+      "paired_n": 5,
+      "missing_matches": [],
+      "means": {
+        "network_stopped_vehicle_seconds": 2833.0,
+        "controlled_lane_queue_mean": 7.078,
+        "completion_fraction": 0.2675675675675676,
+        "completed": 39.6,
+        "unfinished": 108.4,
+        "uninserted": 0.0,
+        "trip_wait_completed_mean_s": 8.186528822055138,
+        "trip_wait_completed_p95_s": 43.05999999999998,
+        "trip_wait_completed_max_s": 85.4,
+        "trip_duration_completed_mean_s": 132.62076441102758,
+        "unfinished_wait_lower_bound_mean_s": 21.795843339050887,
+        "runtime_seconds": 15.986753839997982
+      },
+      "paired_difference_stopped_vehicle_seconds": -205.8,
+      "paired_bootstrap_95_ci": [
+        -297.8,
+        -117.2
+      ],
+      "improvement_pct": 6.7724101619060155
+    },
+    {
+      "scenario": "light",
+      "policy": "fixed",
+      "training_seed": "",
+      "runs": 5,
+      "paired_n": 5,
+      "missing_matches": [],
+      "means": {
+        "network_stopped_vehicle_seconds": 3038.8,
+        "controlled_lane_queue_mean": 7.002,
+        "completion_fraction": 0.25135135135135134,
+        "completed": 37.2,
+        "unfinished": 110.8,
+        "uninserted": 0.0,
+        "trip_wait_completed_mean_s": 8.738406827880514,
+        "trip_wait_completed_p95_s": 55.30999999999997,
+        "trip_wait_completed_max_s": 77.2,
+        "trip_duration_completed_mean_s": 132.83456614509245,
+        "unfinished_wait_lower_bound_mean_s": 23.175397215397215,
+        "runtime_seconds": 14.152774599999248
+      },
+      "paired_difference_stopped_vehicle_seconds": 0.0,
+      "paired_bootstrap_95_ci": [
+        0.0,
+        0.0
+      ],
+      "improvement_pct": -0.0
+    },
+    {
+      "scenario": "light",
+      "policy": "ppo",
+      "training_seed": "42",
+      "runs": 5,
+      "paired_n": 5,
+      "missing_matches": [],
+      "means": {
+        "network_stopped_vehicle_seconds": 2696.6,
+        "controlled_lane_queue_mean": 6.865333333333334,
+        "completion_fraction": 0.2662162162162162,
+        "completed": 39.4,
+        "unfinished": 108.4,
+        "uninserted": 0.2,
+        "trip_wait_completed_mean_s": 7.231551956815115,
+        "trip_wait_completed_p95_s": 41.059999999999995,
+        "trip_wait_completed_max_s": 85.8,
+        "trip_duration_completed_mean_s": 134.2807624831309,
+        "unfinished_wait_lower_bound_mean_s": 20.903701945575392,
+        "runtime_seconds": 15.1098398800008
+      },
+      "paired_difference_stopped_vehicle_seconds": -342.2,
+      "paired_bootstrap_95_ci": [
+        -414.8,
+        -263.6
+      ],
+      "improvement_pct": 11.261024088455969
+    },
+    {
+      "scenario": "normal",
+      "policy": "actuated",
+      "training_seed": "",
+      "runs": 5,
+      "paired_n": 5,
+      "missing_matches": [],
+      "means": {
+        "network_stopped_vehicle_seconds": 4538.2,
+        "controlled_lane_queue_mean": 9.853333333333333,
+        "completion_fraction": 0.2743243243243243,
+        "completed": 81.2,
+        "unfinished": 213.2,
+        "uninserted": 1.6,
+        "trip_wait_completed_mean_s": 6.908944295701323,
+        "trip_wait_completed_p95_s": 28.01,
+        "trip_wait_completed_max_s": 75.6,
+        "trip_duration_completed_mean_s": 131.63286442064555,
+        "unfinished_wait_lower_bound_mean_s": 17.298015658879233,
+        "runtime_seconds": 16.128189820000262
+      },
+      "paired_difference_stopped_vehicle_seconds": -743.6,
+      "paired_bootstrap_95_ci": [
+        -1160.2,
+        -400.8
+      ],
+      "improvement_pct": 14.078533833162938
+    },
+    {
+      "scenario": "normal",
+      "policy": "dqn",
+      "training_seed": "42",
+      "runs": 5,
+      "paired_n": 5,
+      "missing_matches": [],
+      "means": {
+        "network_stopped_vehicle_seconds": 5086.4,
+        "controlled_lane_queue_mean": 9.807333333333334,
+        "completion_fraction": 0.2695945945945946,
+        "completed": 79.8,
+        "unfinished": 215.4,
+        "uninserted": 0.8,
+        "trip_wait_completed_mean_s": 6.95985353480675,
+        "trip_wait_completed_p95_s": 41.38000000000001,
+        "trip_wait_completed_max_s": 85.8,
+        "trip_duration_completed_mean_s": 128.48455387661042,
+        "unfinished_wait_lower_bound_mean_s": 19.656175234861145,
+        "runtime_seconds": 16.91917101999861
+      },
+      "paired_difference_stopped_vehicle_seconds": -195.4,
+      "paired_bootstrap_95_ci": [
+        -671.8,
+        475.4
+      ],
+      "improvement_pct": 3.69949638380855
+    },
+    {
+      "scenario": "normal",
+      "policy": "fixed",
+      "training_seed": "",
+      "runs": 5,
+      "paired_n": 5,
+      "missing_matches": [],
+      "means": {
+        "network_stopped_vehicle_seconds": 5281.8,
+        "controlled_lane_queue_mean": 9.837333333333332,
+        "completion_fraction": 0.26554054054054055,
+        "completed": 78.6,
+        "unfinished": 216.0,
+        "uninserted": 1.4,
+        "trip_wait_completed_mean_s": 7.557799800133244,
+        "trip_wait_completed_p95_s": 51.57999999999997,
+        "trip_wait_completed_max_s": 77.8,
+        "trip_duration_completed_mean_s": 127.80693037974683,
+        "unfinished_wait_lower_bound_mean_s": 20.34764745845845,
+        "runtime_seconds": 16.52864698000194
+      },
+      "paired_difference_stopped_vehicle_seconds": 0.0,
+      "paired_bootstrap_95_ci": [
+        0.0,
+        0.0
+      ],
+      "improvement_pct": -0.0
+    },
+    {
+      "scenario": "normal",
+      "policy": "ppo",
+      "training_seed": "42",
+      "runs": 5,
+      "paired_n": 5,
+      "missing_matches": [],
+      "means": {
+        "network_stopped_vehicle_seconds": 4877.6,
+        "controlled_lane_queue_mean": 10.117333333333331,
+        "completion_fraction": 0.27567567567567564,
+        "completed": 81.6,
+        "unfinished": 213.0,
+        "uninserted": 1.4,
+        "trip_wait_completed_mean_s": 6.897746980767435,
+        "trip_wait_completed_p95_s": 31.61999999999996,
+        "trip_wait_completed_max_s": 86.0,
+        "trip_duration_completed_mean_s": 131.96058868748696,
+        "unfinished_wait_lower_bound_mean_s": 18.862111107875517,
+        "runtime_seconds": 17.03428045999899
+      },
+      "paired_difference_stopped_vehicle_seconds": -404.2,
+      "paired_bootstrap_95_ci": [
+        -781.8,
+        140.0
+      ],
+      "improvement_pct": 7.652694157294861
+    }
+  ],
+  "limitations": [
+    "Pilot or finite training budget; convergence is not established.",
+    "Intervals resample matched evaluation seeds within each training seed; they do not estimate training-seed population uncertainty.",
+    "Completed-only TripInfo waiting/travel times exclude censored unfinished and uninserted trips; inspect completion before comparing them.",
+    "Controlled-lane queue is an incoming-lane snapshot metric, not a whole-network queue or a trip mean.",
+    "Shaped rewards use incoming-count and lane-wait proxies, not movement pressure or measured intersection throughput.",
+    "Derived common plans yellow all released greens and insert all-red. Fixed is this bounded derived plan, not the unmodified source program.",
+    "Original road network is uncalibrated and SUMO reports a never-green source movement; no field traffic claim is supported."
+  ]
+}

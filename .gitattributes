@@ -1,0 +1,8 @@
+# The replay API verifies the exact bytes of these checked-in artifacts.
+docs/benchmark/**/manifest.json text eol=lf
+docs/benchmark/**/raw.csv text eol=lf
+docs/benchmark/**/replay.json text eol=lf
+
+# Keep the bytes of the scenario inputs used by the published benchmark.
+maps/tirupati/*.sumocfg -text
+maps/tirupati/*.rou.xml -text whitespace=cr-at-eol

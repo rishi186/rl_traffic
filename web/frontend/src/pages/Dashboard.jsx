@@ -142,7 +142,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-4 gap-4 mb-8">
         {[
           { label: 'Episode', value: liveState.current_episode, color: 'text-brand-400' },
-          { label: 'Latest Reward', value: liveState.latest_metrics?.reward?.toFixed(2) || '—', color: 'text-green-400' },
+          { label: 'Latest Proxy Return', value: liveState.latest_metrics?.reward?.toFixed(2) || '—', color: 'text-green-400' },
           { label: 'Episodes Logged', value: liveState.metrics_history.length, color: 'text-yellow-400' },
           { label: 'Log Lines', value: liveState.training_log.length, color: 'text-purple-400' },
         ].map((card) => (
@@ -158,7 +158,7 @@ export default function Dashboard() {
         <div className="p-6 rounded-xl bg-slate-900 border border-slate-800">
           <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-brand-400" />
-            Reward Curve
+            Controlled-lane Reward Proxy
           </h3>
           {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>

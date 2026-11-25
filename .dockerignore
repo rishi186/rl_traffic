@@ -15,7 +15,13 @@ venv/
 env/
 .vscode/
 .idea/
+.devin/
+.gravitas/
+graphify-out/
+web/frontend/node_modules/
+web/frontend/dist/
 *.md
 !README.md
+!maps/tirupati/README.md
 Dockerfile
 docker-compose.yml

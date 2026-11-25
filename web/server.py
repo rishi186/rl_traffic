@@ -15,6 +15,9 @@ Run:
 import sys
 import json
 import asyncio
+import os
+import hashlib
+import csv
 import yaml
 from pathlib import Path
 from typing import Dict, List, Optional, Any
@@ -27,7 +30,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 # ---------------------------------------------------------------------------
@@ -66,6 +69,8 @@ _live_state: Dict[str, Any] = {
 }
 
 # WebSocket connection manager
+
+
 class ConnectionManager:
     def __init__(self):
         self.active: List[WebSocket] = []
@@ -96,7 +101,7 @@ manager = ConnectionManager()
 class TrainRequest(BaseModel):
     config_path: str = "config.yaml"
     overrides: Optional[Dict[str, Any]] = None
-    algorithm: str = "dqn"
+    algorithm: Optional[str] = None
 
 
 class ExperimentInfo(BaseModel):
@@ -194,8 +199,9 @@ def _get_experiment_metrics(exp_name: str) -> dict:
             "best_reward": max(m.get("reward", 0) for m in metrics) if metrics else 0,
             "avg_reward": sum(m.get("reward", 0) for m in metrics) / len(metrics) if metrics else 0,
             "last_reward": metrics[-1].get("reward", 0) if metrics else 0,
-            "best_waiting": min(waiting_times) if waiting_times else 0,
-            "best_queue": min(queue_lengths) if queue_lengths else 0,
+            "best_waiting": min(waiting_times) if waiting_times else None,
+            "waiting_metric": "legacy_controlled_lane_wait_snapshot_sum_vehicle_seconds",
+            "best_queue": min(queue_lengths) if queue_lengths else None,
         },
     }
 
@@ -209,22 +215,13 @@ def _get_project_info() -> dict:
     training = config.get("training", {}) if isinstance(config, dict) else {}
     return {
         "name": "Deep Q-Network Traffic Signal Optimization",
-        "description": "A production-grade DQN agent that autonomously optimises traffic signal phases across a multi-intersection urban grid using PyTorch, SUMO simulation, and the TraCI API.",
+        "description": "A reproducible DQN and PPO benchmark with paired SUMO scenarios and measured replay artifacts.",
         "algorithm": training.get("algorithm", "dqn"),
         "total_episodes": training.get("total_episodes", 100),
         "features": [
-            "Dueling Double DQN with Prioritized Experience Replay",
-            "Soft target updates (Polyak averaging)",
-            "Cosine annealing LR scheduler",
-            "Gradient clipping",
-            "Attention-based Q-Network",
-            "Multi-agent parameter sharing",
-            "Improved reward shaping (throughput, switch, congestion)",
-            "Curriculum learning",
-            "Early stopping",
-            "WandB integration",
-            "Hyperparameter sweep runner",
-            "Simulation video recording",
+            "DQN and PPO in PyTorch", "Paired fixed-time and SUMO actuated baselines",
+            "Explicit demand manifests and observation schemas", "Validation-selected checkpoints",
+            "TripInfo and fixed-window network metrics", "Verified synchronized artifact replay",
         ],
         "tech_stack": ["PyTorch", "SUMO", "TraCI", "Gymnasium", "FastAPI", "React"],
         "config": config,
@@ -238,6 +235,43 @@ def _get_project_info() -> dict:
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
+
+
+@app.get("/api/benchmark/replay")
+async def benchmark_replay():
+    """Serve a real hash-matched paired artifact, with no synthetic fallback."""
+    directory = Path(os.environ.get('RL_TRAFFIC_BENCHMARK_DIR', PROJECT_ROOT / 'docs/benchmark/tirupati'))
+    try:
+        replay = json.loads((directory / 'replay.json').read_text())
+        raw_hash = hashlib.sha256((directory / 'raw.csv').read_bytes()).hexdigest()
+        manifest_hash = hashlib.sha256((directory / 'manifest.json').read_bytes()).hexdigest()
+        manifest = json.loads((directory / 'manifest.json').read_text())
+        with (directory / 'raw.csv').open(newline='') as source:
+            rows = list(csv.DictReader(source))
+    except (OSError, ValueError) as exc:
+        raise HTTPException(404, 'Verified replay is unavailable; run the paired benchmark first') from exc
+    if replay.get('raw_csv_sha256') != raw_hash or replay.get('manifest_sha256') != manifest_hash:
+        raise HTTPException(409, 'Replay provenance does not match raw data and manifest')
+    panels = replay.get('panels', [])
+    if len(panels) != 2 or any(p.get('match_id') != replay.get('match_id') for p in panels):
+        raise HTTPException(409, 'Replay policies are not a matched pair')
+    seconds = [[t['elapsed_s'] for t in p['timeline']] for p in panels]
+    if not seconds[0] or seconds[0] != seconds[1]:
+        raise HTTPException(409, 'Replay timelines are not synchronized')
+    if manifest.get('raw_csv_sha256') != raw_hash:
+        raise HTTPException(409, 'Raw CSV does not match its manifest')
+    for panel in panels:
+        matches = [r for r in rows if r['match_id'] == replay['match_id'] and r['policy'] == panel['policy']
+                   and str(r.get('training_seed', '')) == str(panel['metrics'].get('training_seed', ''))]
+        if len(matches) != 1:
+            raise HTTPException(409, 'Replay metrics do not identify a unique raw run')
+        row = matches[0]
+        if float(row['network_stopped_vehicle_seconds']) != sum(t['network_stopped'] for t in panel['timeline']):
+            raise HTTPException(409, 'Replay timeline disagrees with raw stopped vehicle-seconds')
+        for metric in ('completed', 'unfinished', 'uninserted', 'scheduled_demand', 'network_stopped_vehicle_seconds'):
+            if float(row[metric]) != panel['metrics'][metric]:
+                raise HTTPException(409, 'Replay metrics disagree with raw CSV')
+    return replay
 
 
 @app.get("/api/project")
@@ -351,6 +385,8 @@ def _run_training(req: TrainRequest):
 
     cmd = [sys.executable, str(PROJECT_ROOT / "scripts" / "train.py"),
            "--config", req.config_path]
+    if req.algorithm:
+        cmd += ['--algorithm', req.algorithm]
 
     _live_state["training_log"].append(f"Starting training: {' '.join(cmd)}")
 
@@ -371,6 +407,14 @@ def _run_training(req: TrainRequest):
                 if len(_live_state["training_log"]) > 500:
                     _live_state["training_log"] = _live_state["training_log"][-300:]
                 # Try to parse episode info from log lines
+                if 'episode=' in line and 'validation_stopped_vehicle_seconds=' in line:
+                    fields = dict(token.split('=', 1) for token in line.split() if '=' in token)
+                    _live_state['current_episode'] = int(fields['episode'])
+                    latest = {'episode': int(fields['episode']),
+                              'reward': float(fields['reward_proxy']) if 'reward_proxy' in fields else None,
+                              'validation_stopped_vehicle_seconds': float(fields['validation_stopped_vehicle_seconds'])}
+                    _live_state['latest_metrics'] = latest
+                    _live_state['metrics_history'].append(latest)
                 if "Episode" in line and "Reward=" in line:
                     try:
                         parts = line.split("|")

@@ -35,8 +35,8 @@ export default function Experiments() {
   const chartData = detail?.metrics?.map((m) => ({
     episode: m.episode,
     reward: m.reward,
-    waiting: m.avg_waiting_time,
-    queue: m.avg_queue,
+    waiting: m.avg_waiting_time ?? null,
+    queue: m.controlled_lane_queue_mean ?? m.avg_queue ?? null,
   })) || []
 
   return (
@@ -118,7 +118,7 @@ export default function Experiments() {
 
               {/* Reward chart */}
               <div className="p-6 rounded-xl bg-slate-900 border border-slate-800">
-                <h3 className="text-white font-semibold mb-4">Reward & Waiting Time</h3>
+                <h3 className="text-white font-semibold mb-4">Reward proxy & legacy lane wait snapshot</h3>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
@@ -130,14 +130,14 @@ export default function Experiments() {
                     />
                     <Legend />
                     <Line yAxisId="left" type="monotone" dataKey="reward" stroke="#3b82f6" strokeWidth={2} name="Reward" />
-                    <Line yAxisId="right" type="monotone" dataKey="waiting" stroke="#ef4444" strokeWidth={2} name="Avg Wait Time" />
+                    <Line yAxisId="right" type="monotone" dataKey="waiting" stroke="#ef4444" strokeWidth={2} name="Legacy lane waiting sum (veh-s)" />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
 
               {/* Queue chart */}
               <div className="p-6 rounded-xl bg-slate-900 border border-slate-800">
-                <h3 className="text-white font-semibold mb-4">Queue Length Over Episodes</h3>
+                <h3 className="text-white font-semibold mb-4">Controlled incoming-lane queue</h3>
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
@@ -146,7 +146,7 @@ export default function Experiments() {
                     <Tooltip
                       contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
                     />
-                    <Bar dataKey="queue" fill="#8b5cf6" name="Avg Queue" />
+                    <Bar dataKey="queue" fill="#8b5cf6" name="Controlled-lane queue" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

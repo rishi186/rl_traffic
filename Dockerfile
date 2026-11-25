@@ -1,18 +1,15 @@
-FROM python:3.10-slim
+FROM python:3.11-slim-bookworm
 
-# Install SUMO
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    sumo sumo-tools \
-    libgl1-mesa-glx libglib2.0-0 \
+    libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
-
-ENV SUMO_HOME=/usr/share/sumo
 
 WORKDIR /app
 
 # Install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
+    && pip install --no-cache-dir -r requirements.txt eclipse-sumo==1.26.0 traci==1.26.0
 
 # Copy project files
 COPY . .

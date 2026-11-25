@@ -25,7 +25,7 @@ environment:
     emergency_weight: 0.2
     queue_weight: 0.4
     switch_penalty: 0.01
-    throughput_bonus: 0.05
+    incoming_count_decrease_bonus: 0.05
     waiting_time_weight: 0.4
 evaluation:
   num_episodes: 5
@@ -39,12 +39,15 @@ experiment:
   seed: 42
 sumo:
   begin_time: 0
-  cfg_file: maps/sumo.sumocfg
+  cfg_file: maps/tirupati/tirupati.sumocfg
   delta_time: 5
   density_multiplier: 1
   max_green: 50
   min_green: 5
   num_seconds: 5000
+  warmup_seconds: 5
+  all_red_time: 1
+  terminate_when_empty: false
   use_gui: false
   yellow_time: 3
 training:
@@ -64,6 +67,7 @@ training:
     - 128
     learning_rate: 0.0005
     lr_scheduler: cosine
+    lr_scheduler_total_steps: 100000
     lr_scheduler_eta_min: 1.0e-06
     lr_scheduler_gamma: 0.95
     lr_scheduler_step_size: 1000

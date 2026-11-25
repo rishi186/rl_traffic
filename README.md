@@ -1,531 +1,241 @@
-<div align="center">
+# Tirupati traffic signal benchmark
 
-# 🚦 RL Traffic Signal Optimization
+Compare **fixed time, SUMO actuated, PyTorch DQN and PyTorch PPO** on a modeled
+road network in central Tirupati, India. The FastAPI and React demo replays
+600 seconds of a matched fixed-time and DQN simulation.
 
-**A production-grade Deep Q-Network agent that autonomously optimises traffic signal phases across a multi-intersection urban grid.**
+[Run the web demo](#quick-start-windows) · [Open the map in SUMO](#open-the-tirupati-map) ·
+[Run all four policies](#reproduce-smoke-pilot-or-publication-candidate) ·
+[Read the Bengaluru pilot results](#measured-results-and-limits)
 
-Built with PyTorch, SUMO simulation, and the TraCI API.
+## Quick start (Windows)
 
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://python.org)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org)
-[![SUMO](https://img.shields.io/badge/SUMO-1.19%2B-339933?logo=sumo&logoColor=white)](https://sumo.dlr.de)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![React](https://img.shields.io/badge/React-18%2B-61DAFB?logo=react&logoColor=white)](https://react.dev)
-[![License](https://img.shields.io/badge/License-MIT-lightgrey)](LICENSE)
-[![Tests](https://github.com/rishi186/rl_traffic/actions/workflows/ci.yml/badge.svg)](https://github.com/rishi186/rl_traffic/actions/workflows/ci.yml)
+Install Python, Node.js and Eclipse SUMO. Add SUMO's `bin` directory to PATH.
+Run these commands in PowerShell from the repository root:
 
-</div>
-
----
-
-## ✨ Overview
-
-Every day, millions of vehicles idle at intersections controlled by fixed-timer signals — oblivious to actual traffic flow. This project replaces that static logic with a **reinforcement learning agent** that observes real-time traffic conditions and chooses signal phases to minimise waiting time, reduce queue buildup, and prioritise emergency vehicles.
-
-The agent learns through **Deep Q-Learning**: a neural network approximates the optimal action-value function, trained on millions of simulation steps in a SUMO urban grid environment. The result is a controller that adapts to varying traffic densities, from light early-morning flows to dense rush-hour congestion.
-
-> **14% reduction** in average vehicle wait time over fixed-time baselines across 12+ density scenarios.
-
----
-
-## 🧠 Key Features
-
-### Agent Architecture
-
-| Feature | Description |
-|---------|-------------|
-| **Dueling Double DQN** | Separates state value and advantage estimation for better policy learning; uses target network for stable Q-value targets |
-| **Prioritized Experience Replay** | Samples transitions proportional to TD-error, focusing learning on the most surprising experiences |
-| **N-Step Returns** | Blends Monte Carlo and TD(0) for reduced variance in return estimates |
-| **NoisyNet Exploration** | Learnable exploration via noisy network parameters — replaces hand-tuned epsilon-greedy schedules |
-| **Soft Target Updates** | Polyak averaging (τ=0.005) for smoother, more stable target network updates |
-| **Gradient Clipping** | Prevents exploding gradients with configurable max norm (default: 10.0) |
-| **Cosine LR Scheduling** | Anneals learning rate to a minimum over training, with full checkpoint state persistence |
-| **Attention Q-Network** | Optional multi-head self-attention over per-lane features for spatial reasoning across intersection lanes |
-| **Multi-Agent Parameter Sharing** | Shared Q-network with agent ID one-hot embedding for efficient multi-intersection learning |
-
-### Environment & Reward
-
-| Feature | Description |
-|---------|-------------|
-| **Custom Reward Shaping** | Weighted combination of queue length, waiting time, emergency vehicle delay, throughput bonus, switch penalty, and congestion penalty |
-| **Curriculum Learning** | Progressive traffic density scaling (0.25× → 2.0×) to stabilise early learning |
-| **Per-Lane Feature Extraction** | Real-time queue lengths, vehicle density, average speed, and waiting time via TraCI |
-| **Observation Normalisation** | Configurable observation normalisation with system-level and per-agent info channels |
-
-### Developer Experience
-
-| Feature | Description |
-|---------|-------------|
-| **Config Validation** | Comprehensive schema validation with type, range, and cross-field constraint checks |
-| **Early Stopping** | Patience-based termination when reward plateaus (configurable mode, min_delta, patience) |
-| **WandB Integration** | Optional experiment tracking with Weights & Biases — per-agent metrics, system info, and tags |
-| **Per-Agent TensorBoard** | Granular metrics logging with per-intersection breakdown |
-| **Hyperparameter Sweeps** | CLI experiment runner with automatic config generation and override support |
-| **Simulation Video Recording** | Capture SUMO GUI screenshots and compile into MP4 during evaluation |
-| **Web Dashboard** | Full-stack FastAPI + React app with live training monitoring, experiment browsing, and config editing |
-
----
-
-## 🏗️ Architecture
-
-```mermaid
-graph TB
-    subgraph Simulation
-        A[SUMO Simulator<br/>TraCI API]
-    end
-
-    subgraph Environment
-        B[Feature Engineering<br/>Queue · Density · Speed · Wait · Phase]
-        F[Custom Reward Shaping<br/>α·Queue + β·Wait + γ·Emergency<br/>+ Throughput − Switch − Congestion]
-    end
-
-    subgraph Agent
-        C[DQN Agent<br/>PyTorch 256→256→128]
-        D[Replay Buffer<br/>Uniform / Prioritized]
-        E[Target Network<br/>Soft Update τ=0.005]
-    end
-
-    subgraph Training
-        G[Curriculum Scheduler<br/>Density Scaling]
-        H[Early Stopping<br/>Patience Monitor]
-        I[WandB / TensorBoard<br/>Metrics Logging]
-    end
-
-    subgraph Web
-        J[FastAPI Backend<br/>REST + WebSocket]
-        K[React Frontend<br/>Dashboard · Experiments · Config]
-    end
-
-    A -->|State| B
-    B -->|Observation Vector| C
-    C -->|Action: Keep / Switch Phase| A
-    F -->|Reward| C
-    C -->|Experience Tuple| D
-    D -->|Mini-batch| C
-    C -->|Polyak Average| E
-    E -->|Target Q-Values| C
-    G -->|Density Multiplier| A
-    H -->|Stop Signal| C
-    C -->|Metrics| I
-    J -->|Live State| K
-    K -->|Start/Stop/Config| J
-    J -->|Monitor| C
+```powershell
+python -m venv .venv  # skip if .venv already exists
+.venv/Scripts/python.exe -m pip install -r requirements.txt
+npm.cmd --prefix web/frontend ci
+npm.cmd --prefix web/frontend run build
+.venv/Scripts/python.exe -m uvicorn web.server:app --host 127.0.0.1 --port 8000
 ```
 
----
+Open [Demo](http://127.0.0.1:8000/demo) and press **Play**. The bundled replay
+uses synthetic traffic and SUMO-generated signals. Results describe the simulation.
+The reference Windows runs used SUMO/TraCI 1.26.0, Python 3.14.5, PyTorch 2.12.0,
+and Node 24.15.0. [Full Python environment](docs/benchmark/environment-windows.txt)
 
-## 📁 Project Structure
+## Open the Tirupati map
 
-```
-rl_traffic/
-├── config.yaml                              # Experiment configuration
-├── requirements.txt                         # Python dependencies
-├── Dockerfile                               # Containerised environment
-├── docker-compose.yml                       # Service orchestration
-│
-├── maps/                                    # SUMO simulation files
-│   ├── sumo.sumocfg                         # Simulation config
-│   ├── map_tls_fixed.net.xml                # Road network definition
-│   ├── map.rou_rl_ready.xml                 # Vehicle routes
-│   └── density_variants/                    # 12+ density configurations
-│
-├── src/
-│   ├── agents/
-│   │   ├── dqn_agent.py                     # DQN: Dueling, Double, PER, NoisyNet, Attention
-│   │   ├── ppo_agent.py                     # PPO: Actor-Critic with GAE
-│   │   ├── replay_buffer.py                 # Uniform experience replay
-│   │   ├── prioritized_replay_buffer.py     # PER with SumTree
-│   │   ├── nstep_buffer.py                  # N-step return collector
-│   │   └── layers/noisy_linear.py           # NoisyNet linear layer
-│   ├── environment/
-│   │   └── sumo_env.py                      # Multi-agent SUMO Gymnasium env
-│   ├── training/
-│   │   ├── curriculum.py                    # Curriculum density scheduler
-│   │   └── early_stopping.py                # Patience-based early stopping
-│   ├── utils/
-│   │   ├── logger.py                        # Centralised logging
-│   │   ├── config_validator.py              # Config schema validation
-│   │   └── wandb_logger.py                  # WandB integration wrapper
-│   └── visualization/
-│       ├── plot_training.py                 # Training curves
-│       ├── plot_comparison.py               # Baseline comparison charts
-│       ├── plot_generalization.py           # Density sweep plots
-│       └── plot_signal_timeline.py          # Phase timeline visualisation
-│
-├── scripts/
-│   ├── train.py                             # Training entry point (DQN/PPO)
-│   ├── evaluate.py                          # Model evaluation
-│   ├── baseline_fixed.py                    # Fixed-time baseline runner
-│   ├── generate_density_configs.py          # Generate density variant configs
-│   ├── evaluate_generalization.py           # Cross-density generalisation eval
-│   ├── generate_report.py                   # Automated performance report
-│   ├── run_experiments.py                   # Hyperparameter sweep runner
-│   └── record_video.py                      # Simulation video recording
-│
-├── web/                                     # Full-stack web application
-│   ├── server.py                            # FastAPI backend (REST + WebSocket)
-│   ├── README.md                            # Web app documentation
-│   └── frontend/
-│       ├── package.json                     # Node.js dependencies
-│       ├── vite.config.js                   # Vite dev server config
-│       ├── tailwind.config.js               # Tailwind CSS config
-│       └── src/
-│           ├── App.jsx                      # Main app with sidebar navigation
-│           ├── main.jsx                     # React entry point
-│           ├── components/ErrorBoundary.jsx # Crash recovery boundary
-│           ├── lib/api.js                   # API client + WebSocket helper
-│           ├── lib/utils.js                 # Tailwind class merge utility
-│           └── pages/
-│               ├── Landing.jsx              # Project showcase & architecture
-│               ├── Dashboard.jsx            # Live training dashboard
-│               ├── Experiments.jsx          # Experiment browser & charts
-│               ├── Demo.jsx                 # Interactive simulation config
-│               └── Config.jsx               # Config editor with live toggles
-│
-├── tests/
-│   ├── test_dqn_agent.py                    # Core DQN agent tests
-│   ├── test_dqn_advanced.py                 # Advanced features (soft update, attention, etc.)
-│   ├── test_replay_buffer.py                # Replay buffer tests
-│   ├── test_reward.py                       # Reward function tests
-│   ├── test_observations.py                 # Observation tests
-│   ├── test_config.py                       # Config validation tests
-│   └── test_utils.py                        # Utility module tests
-│
-└── .github/workflows/ci.yml                 # CI pipeline
+New runs use central Tirupati by default. The scenario covers the railway station
+and APSRTC bus station area with OpenStreetMap roads, ten SUMO-generated signal
+controllers and synthetic passenger trips. See [scenario details and map attribution](maps/tirupati/README.md).
+
+```powershell
+sumo-gui -c maps/tirupati/tirupati.sumocfg
 ```
 
----
+Press **Play** to start the built-in fixed-time programs. The Bengaluru scenario
+is still available at `maps/sumo.sumocfg`. Its trained models use Bengaluru's
+signal and lane IDs. Train fresh checkpoints for Tirupati.
 
-## 🚀 Quick Start
+## Verify before running experiments
 
-### Prerequisites
-
-| Requirement | Version | Install |
-|-------------|---------|---------|
-| **Python** | 3.10+ | [python.org](https://python.org) |
-| **SUMO** | 1.19+ | [sumo.dlr.de](https://sumo.dlr.de) |
-| **Node.js** | 18+ (web app only) | [nodejs.org](https://nodejs.org) |
-
-### 1. Install Dependencies
-
-```bash
-# Python dependencies
-pip install -r requirements.txt
-
-# Set SUMO_HOME environment variable
-# Linux/macOS:
-export SUMO_HOME=/usr/share/sumo
-
-# Windows:
-set SUMO_HOME=C:\Program Files (x86)\Eclipse\Sumo
+```powershell
+.venv/Scripts/python.exe -m pytest tests -q
+.venv/Scripts/python.exe -m flake8 src scripts tests web/server.py --max-line-length=120 --ignore=E402,W503,E501
+.venv/Scripts/python.exe -m pytest tests -m integration -v
 ```
 
-<details>
-<summary>Optional dependencies</summary>
+The tiny one-junction fixture is checked in with netconvert input files. Integration
+tests start a real simulator and verify shutdown. Tests also cover action timing,
+network accounting, PPO behavior alignment and GAE, singleton updates, checkpoint
+schemas, replay boundaries, missing matches and exact episode-boundary resume.
+CI installs SUMO, executes integration checks and builds React with `npm ci`.
+GitHub CI itself has not been run by this local upgrade.
 
-```bash
-# Weights & Biases (experiment tracking)
-pip install wandb
+## Reproduce smoke, pilot or publication candidate
 
-# Video recording (simulation capture)
-pip install opencv-python
-```
-</details>
+Every output directory must be new. Existing results/checkpoints are never reused
+or overwritten implicitly. These commands use Tirupati. To reproduce the
+Bengaluru protocol, pass a copy of `config.yaml` whose `sumo.cfg_file` is
+`maps/sumo.sumocfg`. Run from the repository root:
 
-### 2. Train the Agent
+```powershell
+# Tiny runtime budget on the existing road network: 1 training episode per learner,
+# one normal demand/seed pair, four policies, 30 measured seconds.
+.venv/Scripts/python.exe scripts/run_experiments.py --config config.yaml --benchmark-profile smoke --output-dir results/smoke-reproduction
 
-```bash
-# Train DQN agent with default config
-python scripts/train.py --config config.yaml
+# Actual pilot protocol: 2 training episodes per learner at 120 measured seconds,
+# validation light demand/seed 7001; smoke first, then 3 demands x 5 seeds x 4 policies.
+# Evaluation: 300 measured seconds + 5 warm-up seconds, one training seed (42).
+.venv/Scripts/python.exe scripts/run_experiments.py --config config.yaml --benchmark-profile pilot --output-dir results/pilot-reproduction
 
-# Resume from a checkpoint
-python scripts/train.py --config config.yaml --resume results/models/checkpoint_ep50.pth
-
-# Train with PPO instead
-# Set training.algorithm: "ppo" in config.yaml
-```
-
-### 3. Evaluate & Compare
-
-```bash
-# Run fixed-time baseline
-python scripts/baseline_fixed.py --config config.yaml --episodes 5
-
-# Evaluate trained model
-python scripts/evaluate.py --config config.yaml --model results/models/best_model.pth
-
-# Generalization across 12+ density scenarios
-python scripts/evaluate_generalization.py --config config.yaml \
-    --model results/models/best_model.pth --mode runtime
-
-# Generate automated performance report
-python scripts/generate_report.py --results-dir results
+# Exact publication-candidate command (not executed in this upgrade):
+# DQN/PPO: 100 episodes x training seeds 42,43,44; 5000 measured seconds;
+# evaluation: light/normal/heavy/held-out rush_hour x seeds 101..105.
+.venv/Scripts/python.exe scripts/run_experiments.py --config config.yaml --benchmark-profile publication --output-dir results/publication-v1
 ```
 
-### 4. Visualise Results
+`run_all.ps1` and `run_all.bat` call the same campaign entry point and default to
+smoke. The larger campaign trains three seeds per learner and reports them
+separately. Its bootstrap intervals describe variation across evaluation seeds.
 
-```bash
-# Training curves
-python src/visualization/plot_training.py --metrics results/training_metrics.json
+To run the smoke campaign in a container, use `docker compose run --build --rm smoke`.
+It writes to `results/docker-smoke`. Pass `--output-dir results/docker-smoke-2`
+after `smoke` for a fresh run. Use `docker compose run --rm evaluate --help`
+or `docker compose run --rm generalization --help` to see checkpoint and
+manifest arguments.
 
-# Baseline comparison charts
-python src/visualization/plot_comparison.py \
-    --eval results/eval/eval_results.json \
-    --baseline results/baseline/baseline_results.json
+Campaign directories contain explicit demand files and their manifest, isolated
+DQN/PPO training runs, a smoke matrix, and (for pilot/publication) an `evaluation/`
+bundle: `raw.csv`, `manifest.json`, `summary.json`, `paired-comparison.png`,
+`report.md`, full TripInfo and per-second replay logs. Configs, seeds, Git revision,
+actual versions, source/scenario/model hashes and exact dirty-source archives
+(`source.zip`) are saved. Outputs carry the actual source digest even before commit.
 
-# Generalization across densities
-python src/visualization/plot_generalization.py \
-    --results results/generalization/generalization_results.json
+The demand generator preserves vehicle types and complete named/inline routes,
+sorts explicit departure schedules, and rejects unexpanded flows/distributions.
+Light/normal/heavy use 0.5/1/1.5 times the selected base vehicles. Rush-hour shifts
+normal demand into a central peak and is excluded from training/validation.
+
+## Timing, control and metric contract
+
+- `sumo.num_seconds` is the **measured window in simulated seconds** after
+  `warmup_seconds`; all policies use step-length 1 second, the same warm-up,
+  demand, seed and final partial decision. Legacy `max_steps_per_episode` does
+  not stop the simulator. Fixed-window evaluation keeps sampling after demand
+  clears. Natural completion and artificial time-limit truncation are distinct.
+- Signals and incoming lanes are sorted. The checkpoint sidecar records lane and
+  signal IDs, green-state order, feature normalization, padding, dimensions and
+  action schema. Binary requests mean hold / next cyclic green; minimum green,
+  maximum green and complete yellow/all-red sequences govern what is applied.
+  Requested and applied switches are logged separately. All compared policies
+  receive the same derived clearance plan. Fixed green durations use the source
+  program clipped to min/max; actuated uses SUMO gap actuation on that plan.
+- **Primary:** `network_stopped_vehicle_seconds`, the 1 Hz count of all network
+  vehicles at speed <= 0.1 m/s integrated over the measured window. Warm-up is
+  excluded. This is not a mean trip wait.
+- `controlled_lane_queue_mean` averages the deduplicated incoming controlled-lane
+  halting count at 1 Hz. It excludes other roads/internal lanes and is not a
+  whole-network queue. Legacy lane-wait snapshots are vehicle-second sums across
+  controlled lanes, not average vehicle waiting times.
+- TripInfo supplies completed-trip waiting/duration means, waiting p95/max,
+  completion fraction, unfinished and uninserted demand. Whole-trip statistics
+  include warm-up exposure. Unfinished waiting is a censored lower bound.
+  Scheduled demand counts departures before the episode end; future departures
+  are outside this episode. Empty completed samples are null, never zero.
+- Arrivals/departures are accumulated once per network tick. Reward components
+  are **proxies**: lane queue, lane waiting snapshots, emergency current wait,
+  incoming-count decrease, switch and density penalties. The legacy `pressure`
+  reward is incoming vehicle count, not movement pressure. No max-pressure
+  baseline is claimed.
+- A comparison is keyed by scenario/input hashes, seed, timing, safety parameters,
+  actual window length and observation schema. Improvements are null for missing
+  matches or a zero baseline. Reports/plots regenerate from the same raw CSV;
+  percentile bootstrap uses matched evaluation-seed differences (10,000 draws,
+  RNG seed 42). Negative policy-minus-fixed differences favor the policy.
+
+## Individual entry points and checkpoints
+
+```powershell
+.venv/Scripts/python.exe scripts/generate_density_configs.py --config config.yaml --output-dir results/demand-new
+.venv/Scripts/python.exe scripts/train.py --config config.yaml --algorithm dqn --run-dir results/train-new
+.venv/Scripts/python.exe scripts/baseline_fixed.py --config config.yaml --episodes 5 --output-dir results/fixed-new
+.venv/Scripts/python.exe scripts/evaluate.py --config config.yaml --model results/train-new/models/best_model.pth --episodes 5 --output-dir results/eval-new
+.venv/Scripts/python.exe scripts/generate_report.py --results-dir results/pilot-reproduction/evaluation
+.venv/Scripts/python.exe src/visualization/plot_comparison.py --results-dir results/pilot-reproduction/evaluation
 ```
 
-### 5. Run Hyperparameter Sweeps
+The campaign is the recommended paired entry point: individual aggregates must not
+be combined across densities/horizons. The former `--mode runtime` generalization
+path was replaced with explicit `--manifest`, `--dqn-model`, `--ppo-model`,
+`--seeds`, `--scenarios`, and `--horizon` arguments; see `--help`.
 
-```bash
-# Single run with CLI overrides
-python scripts/run_experiments.py --config config.yaml \
-    --override training.total_episodes=200 dqn.learning_rate=0.001
+Training selects `best_model.pth` on validation stopped vehicle-seconds. Pass
+`--validation-scenarios` and `--validation-seeds` for explicit scenarios; standalone
+training defaults to its training scenario with held-out validation seed 7001.
+Use `--warm-start model.pth` for a **weights-only restart**. Legacy checkpoints
+without a verifiable observation schema require `--allow-unverified`; this never
+asserts compatibility. Different schemas are rejected even if tensor shapes match.
 
-# Full sweep from a sweep config file
-python scripts/run_experiments.py --config config.yaml --sweep configs/sweep.yaml
+`--resume path/to/resume.pt` is an **exact episode-boundary resume** and requires
+matching config, source/dependencies, Python/SUMO, training/validation input hashes,
+and schema. It restores replay, optimizer/scheduler, RNG, counters and validation
+selection state into a new run directory. Only the episode stopping budget and
+output directory may change. Load only trusted local resume bundles. The explicit
+DQN cosine schedule length stays fixed when the episode budget is extended.
+Benchmark training uses one-step DQN; the unsafe legacy interleaved n-step collector
+and ID-embedding configurations are rejected. The existing agents/network
+architectures remain available for compatible weights; legacy optional training
+orchestration features are not benchmark modes.
+
+## Genuine replay
+
+```powershell
+.venv/Scripts/python.exe -m uvicorn web.server:app --host 127.0.0.1 --port 8000
 ```
 
-### 6. Record Simulation Video
+The default replay in `docs/benchmark/tirupati/` compares fixed time and DQN
+for one matched 600-second run with synthetic demand. Set
+`$env:RL_TRAFFIC_BENCHMARK_DIR` to `docs/benchmark/pilot` to view the recorded
+Bengaluru pilot, or to a new campaign's `evaluation` directory. Set it before
+starting the server. Both policy panels, signal-state display, network stopped
+counts, selected-signal queues and chart cursor share one per-second clock.
+Final completion and TripInfo statistics are explicitly separated from the current
+frame. Provenance and limitations are visible. Missing or mismatched artifacts
+produce an error, never placeholder metrics. The API checks hashes, match IDs,
+time alignment and timeline totals against raw data. This is artifact playback,
+not an interactive live SUMO execution or a video.
 
-```bash
-python scripts/record_video.py --config config.yaml \
-    --model results/models/best_model.pth --output results/videos/sim.mp4
-```
+## Measured results and limits
 
----
+Completed Bengaluru pilot: 60 real SUMO evaluations (three demands, five matched seeds,
+four policies), with 300 measured seconds plus five warm-up seconds per run.
+Both learners trained for two 120-second episodes with one training seed.
 
-## 🖥️ Web Dashboard
+Mean **network stopped vehicle-seconds** (lower is better):
 
-A full-stack web application for monitoring training, browsing experiments, and editing configuration — all from the browser.
+| Demand | Fixed time | SUMO actuated | DQN | PPO |
+|---|---:|---:|---:|---:|
+| light | 3,038.8 | 2,430.4 | 2,833.0 | 2,696.6 |
+| normal | 5,281.8 | 4,538.2 | 5,086.4 | 4,877.6 |
+| heavy | 7,884.0 | 7,324.2 | 7,837.0 | 7,581.4 |
 
-<div align="center">
+Actuated has the lowest mean in all three demands. Learner-versus-fixed paired
+95% bootstrap intervals cross zero in normal and heavy demand, so those pilot
+differences do not establish a reliable benefit. Group mean completion is only
+21.8–27.6%; completed-trip waiting statistics alone are insufficient evidence.
 
-| Page | Description |
-|------|-------------|
-| **Landing** | Project showcase with architecture diagram, feature grid, and tech stack |
-| **Dashboard** | Live training metrics via WebSocket, reward curves, real-time training log |
-| **Experiments** | Browse past runs, view reward/waiting/queue charts, compare experiments |
-| **Demo** | Configure simulation parameters, select trained models, run simulations |
-| **Config** | Edit `config.yaml` from the browser with toggles, sliders, and number inputs |
+Actual evaluation runtime: **16.57 seconds mean**, 15.41 seconds median,
+13.03–30.75 seconds per run; 994.19 seconds summed evaluation runtime. Startup
+and telemetry are included in per-run times. Full publication training was not
+executed: its 600 training episodes plus validation represent a much larger
+budget than this pilot. The exact publication command is above.
 
-</div>
+See [the generated report](docs/benchmark/pilot/report.md) for all outcomes,
+waiting tails, queues and paired intervals, and [the verification ledger](docs/benchmark/verification.md)
+for commands, source versions, tests and limitations. Full TripInfo/replays and
+checkpoint/source archives remain under the isolated local campaign directories;
+the compact report/raw-data/replay bundle is retained in `docs/benchmark/pilot/`.
 
-### Run the Web App
+The original network is uncalibrated. SUMO reports a missing-yellow source program
+and one never-green source movement. Emergency-braking and red-light emergency-stop
+warnings were also observed in heavy fixed-time evaluation. Derived common plans
+supply legal clearance sequences but do not calibrate the road network or certify
+road safety. No real-world effectiveness or generalized superiority is established.
+Pilot uncertainty uses only five evaluation seeds and one training seed.
 
-```bash
-# Terminal 1 — Backend
-pip install fastapi uvicorn websockets
-python web/server.py
+The replay API/data checks and frontend build passed. Browser origin approval
+blocked visual interaction QA; no browser screenshot or visual verification is claimed.
 
-# Terminal 2 — Frontend (dev mode)
-cd web/frontend
-npm install
-npm run dev
-```
+## Semantics references
 
-Open **http://localhost:5173** in your browser.
+Implementation decisions follow the [SUMO traffic-light control API](https://sumo.dlr.de/docs/TraCI/Change_Traffic_Lights_State.html),
+[SUMO TripInfo definitions](https://sumo.dlr.de/docs/Simulation/Output/TripInfo.html),
+and [Gymnasium terminal/truncation bootstrap guidance](https://gymnasium.farama.org/tutorials/gymnasium_basics/handling_time_limits/).
+The repository's executable tests and raw simulator artifacts supply verification.
 
-<details>
-<summary>Production build</summary>
-
-```bash
-cd web/frontend
-npm run build
-# FastAPI serves the built frontend at http://localhost:8000
-```
-</details>
-
----
-
-## 🐳 Docker
-
-```bash
-# Build the container
-docker-compose build
-
-# Train the agent
-docker-compose up train
-
-# Run baseline evaluation
-docker-compose up baseline
-
-# Evaluate trained model
-docker-compose up evaluate
-
-# Cross-density generalization
-docker-compose up generalization
-
-# Generate performance report with visualisations
-docker-compose up report
-```
-
----
-
-## ⚙️ Configuration Reference
-
-### Experiment
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `experiment.name` | `multi_agent_traffic_dqn` | Experiment identifier |
-| `experiment.seed` | `42` | Random seed for reproducibility |
-| `experiment.device` | `cpu` | Device: `cpu` or `cuda` |
-| `experiment.log_dir` | `results` | Output directory |
-
-### Training
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `training.algorithm` | `dqn` | Agent type: `dqn` or `ppo` |
-| `training.total_episodes` | `100` | Number of training episodes |
-| `training.max_steps_per_episode` | `1000` | Max simulation steps per episode |
-| `training.batch_size` | `64` | Mini-batch size for training |
-| `training.learning_rate` | `0.0005` | Optimiser learning rate |
-| `training.gamma` | `0.99` | Discount factor |
-| `training.save_freq` | `1` | Checkpoint save frequency (episodes) |
-| `training.eval_freq` | `1` | Evaluation frequency (episodes) |
-
-### DQN Hyperparameters
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `dqn.epsilon_start` | `1.0` | Initial exploration rate |
-| `dqn.epsilon_end` | `0.01` | Minimum exploration rate |
-| `dqn.epsilon_decay` | `0.995` | Epsilon decay per update |
-| `dqn.target_update_freq` | `10` | Steps between target network sync |
-| `dqn.replay_buffer_size` | `100000` | Max replay buffer capacity |
-| `dqn.hidden_dims` | `[256, 256, 128]` | Hidden layer sizes |
-| `dqn.dueling` | `true` | Enable Dueling DQN architecture |
-| `dqn.double_dqn` | `true` | Use Double DQN for target computation |
-| `dqn.per` | `false` | Prioritized Experience Replay |
-| `dqn.n_step` | `1` | N-step returns (1 = standard TD) |
-| `dqn.noisy_net` | `false` | NoisyNet exploration (disables ε-greedy) |
-| `dqn.soft_update_tau` | `0.005` | Polyak averaging τ (0 = hard update) |
-| `dqn.grad_clip` | `10.0` | Max gradient norm (0 = no clipping) |
-| `dqn.lr_scheduler` | `cosine` | LR scheduler: `none`, `cosine`, `step` |
-| `dqn.use_attention` | `false` | Self-attention over per-lane features |
-| `dqn.num_agents` | `0` | Agent count for parameter sharing (0 = off) |
-
-### Reward Shaping
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `reward_type` | `custom-shaped` | Reward function variant |
-| `reward_weights.queue_weight` | `0.4` | Queue length penalty weight (α) |
-| `reward_weights.waiting_time_weight` | `0.4` | Waiting time penalty weight (β) |
-| `reward_weights.emergency_weight` | `0.2` | Emergency vehicle delay weight (γ) |
-| `reward_weights.throughput_bonus` | `0.05` | Reward for clearing vehicles |
-| `reward_weights.switch_penalty` | `0.01` | Penalty for phase switching |
-| `reward_weights.congestion_penalty` | `0.1` | Extra penalty when density > threshold |
-| `reward_weights.congestion_threshold` | `0.8` | Density fraction triggering congestion penalty |
-
-### Early Stopping
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `early_stopping.enabled` | `false` | Enable early stopping |
-| `early_stopping.patience` | `15` | Episodes without improvement before stopping |
-| `early_stopping.min_delta` | `0.0` | Minimum change to qualify as improvement |
-| `early_stopping.mode` | `max` | `max` (higher is better) or `min` |
-
-### Evaluation
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `evaluation.num_episodes` | `5` | Number of evaluation episodes |
-| `evaluation.save_video` | `false` | Record simulation video during eval |
-| `evaluation.video_fps` | `10` | FPS for recorded video |
-| `evaluation.video_dir` | `results/videos` | Output directory for videos |
-
----
-
-## 🧪 Testing
-
-```bash
-# Run all tests
-pytest tests/ -v
-
-# Run specific test module
-pytest tests/test_dqn_agent.py -v
-
-# Run with coverage
-pytest tests/ --cov=src --cov-report=term-missing
-```
-
-**Test coverage:**
-
-| Test File | Covers |
-|-----------|--------|
-| `test_dqn_agent.py` | Q-Network, agent init, action selection, training step, save/load |
-| `test_dqn_advanced.py` | Soft target updates, gradient clipping, LR scheduler, attention Q-Net, parameter sharing |
-| `test_replay_buffer.py` | Uniform and prioritized replay buffers, N-step buffer |
-| `test_reward.py` | All reward function variants and weight configurations |
-| `test_observations.py` | Observation space, feature extraction, normalisation |
-| `test_config.py` | Config validation rules, schema checks, cross-field constraints |
-| `test_utils.py` | Early stopping logic, WandB logger, config validator |
-
----
-
-## 📊 Monitoring
-
-### TensorBoard
-
-```bash
-tensorboard --logdir results/tensorboard
-# Open http://localhost:6006
-```
-
-Logs include per-episode reward, loss, epsilon, learning rate, and per-agent metrics.
-
-### Weights & Biases
-
-1. Install: `pip install wandb`
-2. Set API key: `export WANDB_API_KEY=your_key`
-3. Enable in `config.yaml`:
-```yaml
-experiment:
-  wandb:
-    enabled: true
-    project: "rl-traffic"
-    tags: ["dqn", "traffic"]
-```
-
----
-
-## 🔄 One-Click Pipeline
-
-Run the entire training → evaluation → report pipeline:
-
-```bash
-# Windows (PowerShell)
-.\run_all.ps1
-
-# Windows (CMD)
-.\run_all.bat
-```
-
-This script:
-1. Trains the DQN agent
-2. Runs the fixed-time baseline
-3. Evaluates the trained model
-4. Tests generalization across 12+ densities
-5. Generates visualisations and a performance report
-
----
-
-## 📜 License
-
-MIT License — see [LICENSE](LICENSE) for details.
-
----
-
-<div align="center">
-
-**Built with** ❤️ **using PyTorch, SUMO, and the TraCI API**
-
-</div>
+Project code is distributed under the [MIT License](LICENSE). The Tirupati road
+data uses the [Open Database License](maps/tirupati/README.md).

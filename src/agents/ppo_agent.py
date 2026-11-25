@@ -83,6 +83,8 @@ class PPOAgent:
         log_prob: float,
         value: float,
         done: bool,
+        next_obs: np.ndarray = None,
+        truncated: bool = False,
     ) -> None:
         """Store a transition for a given agent.
 
@@ -96,12 +98,14 @@ class PPOAgent:
             done: Whether the episode ended.
         """
         self.storage[agent_id].append({
-            'obs': obs,
+            'obs': np.array(obs, dtype=np.float32, copy=True),
             'action': action,
             'reward': reward,
             'log_prob': log_prob,
             'value': value,
-            'done': done
+            'done': done,
+            'truncated': truncated,
+            'next_obs': None if next_obs is None else np.array(next_obs, dtype=np.float32, copy=True),
         })
 
     def compute_gae(
@@ -110,6 +114,8 @@ class PPOAgent:
         values: List[float],
         dones: List[bool],
         next_value: float,
+        truncateds=None,
+        next_values=None,
     ) -> Tuple[List[float], List[float]]:
         """Compute Generalized Advantage Estimation.
 
@@ -126,15 +132,15 @@ class PPOAgent:
         returns = []
         gae = 0
 
-        values = values + [next_value]
+        truncateds = truncateds or [False] * len(rewards)
+        next_values = next_values if next_values is not None else values[1:] + [next_value]
 
         for t in reversed(range(len(rewards))):
-            if dones[t]:
-                delta = rewards[t] - values[t]
-                gae = delta
-            else:
-                delta = rewards[t] + self.gamma * values[t + 1] - values[t]
-                gae = delta + self.gamma * self.gae_lambda * gae
+            # Natural terminals disable bootstrap. Time limits bootstrap the
+            # true final state, but both boundaries cut the recursive trace.
+            delta = rewards[t] + self.gamma * next_values[t] * (not dones[t]) - values[t]
+            trace = not (dones[t] or truncateds[t])
+            gae = delta + self.gamma * self.gae_lambda * trace * gae
 
             advantages.insert(0, gae)
             returns.insert(0, gae + values[t])
@@ -167,16 +173,19 @@ class PPOAgent:
             values = [t['value'] for t in transitions]
             dones = [t['done'] for t in transitions]
 
-            if dones[-1]:
-                next_value = 0.0
-            else:
-                next_obs = obs[-1]
-                obs_tensor = torch.FloatTensor(next_obs).unsqueeze(0).to(self.device)
-                with torch.no_grad():
-                    _, next_value = self.policy(obs_tensor)
-                    next_value = next_value.item()
-
-            advantages, returns = self.compute_gae(rewards, values, dones, next_value)
+            next_values = []
+            for t in transitions:
+                if t['done']:
+                    next_values.append(0.0)
+                else:
+                    if t['next_obs'] is None:
+                        raise ValueError('PPO bootstrap requires the true next observation')
+                    with torch.no_grad():
+                        _, v = self.policy(torch.as_tensor(t['next_obs'], device=self.device).unsqueeze(0))
+                    next_values.append(v.item())
+            advantages, returns = self.compute_gae(
+                rewards, values, dones, next_values[-1],
+                [t['truncated'] for t in transitions], next_values)
 
             all_obs.extend(obs)
             all_actions.extend(actions)
@@ -193,7 +202,7 @@ class PPOAgent:
         advantages_tensor = torch.FloatTensor(all_advantages).to(self.device)
         returns_tensor = torch.FloatTensor(all_returns).to(self.device)
 
-        advantages_tensor = (advantages_tensor - advantages_tensor.mean()) / (advantages_tensor.std() + 1e-8)
+        advantages_tensor = (advantages_tensor - advantages_tensor.mean()) / (advantages_tensor.std(unbiased=False) + 1e-8)
 
         dataset_size = len(all_obs)
         indices = np.arange(dataset_size)
@@ -226,9 +235,11 @@ class PPOAgent:
                 surr2 = torch.clamp(ratio, 1.0 - self.clip_epsilon, 1.0 + self.clip_epsilon) * batch_advantages
                 policy_loss = -torch.min(surr1, surr2).mean()
 
-                value_loss = nn.MSELoss()(values.squeeze(), batch_returns)
+                value_loss = nn.MSELoss()(values.squeeze(-1), batch_returns)
 
                 loss = policy_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy
+                if not torch.isfinite(loss):
+                    raise FloatingPointError('Non-finite PPO loss')
 
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -259,7 +270,7 @@ class PPOAgent:
         }, path)
         logger.info("PPO model saved to %s", path)
 
-    def load(self, path: str) -> None:
+    def load(self, path: str, weights_only: bool = False) -> None:
         """Load model weights and optimizer state.
 
         Args:
@@ -267,7 +278,8 @@ class PPOAgent:
         """
         checkpoint = torch.load(path, map_location=self.device)
         self.policy.load_state_dict(checkpoint['policy_state_dict'])
-        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        if not weights_only:
+            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         logger.info("PPO model loaded from %s", path)
 
     def get_config_summary(self) -> Dict[str, object]:

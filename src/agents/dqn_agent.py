@@ -278,7 +278,9 @@ class DQNAgent:
 
         # Learning rate scheduler
         if self.lr_scheduler_type == "cosine":
-            total_steps = config["training"].get("total_episodes", 100) * config["training"].get("max_steps_per_episode", 1000)
+            # A run may extend its episode budget on exact resume. The learning
+            # rate schedule must not change when that stopping budget changes.
+            total_steps = dqn_cfg.get("lr_scheduler_total_steps", 100000)
             self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
                 self.optimizer,
                 T_max=total_steps,
@@ -362,7 +364,7 @@ class DQNAgent:
         self.q_network.eval()
         with torch.no_grad():
             obs_tensor = torch.as_tensor(obs, dtype=torch.float32, device=self.device).unsqueeze(0)
-            if self.noisy_net:
+            if self.noisy_net and not deterministic:
                 self.q_network.reset_noise()
             q_values = self.q_network(obs_tensor).cpu().numpy()[0]
 
@@ -543,13 +545,18 @@ class DQNAgent:
         torch.save(save_dict, path)
         logger.info("DQN model saved to %s", path)
 
-    def load(self, path: str) -> None:
+    def load(self, path: str, weights_only: bool = False) -> None:
         """Load Q-network weights and state from a file.
 
         Args:
             path: Source file path.
         """
         checkpoint = torch.load(path, map_location=self.device)
+        if weights_only:
+            weights = checkpoint.get('q_network_state_dict', checkpoint) if isinstance(checkpoint, dict) else checkpoint
+            self.q_network.load_state_dict(weights)
+            self._hard_update_target()
+            return
         if isinstance(checkpoint, dict) and 'q_network_state_dict' in checkpoint:
             self.q_network.load_state_dict(checkpoint['q_network_state_dict'])
             if 'target_network_state_dict' in checkpoint:

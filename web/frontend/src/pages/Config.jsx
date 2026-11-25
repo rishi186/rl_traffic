@@ -102,7 +102,7 @@ export default function Config() {
       <ConfigSection title="Training">
         <ConfigField label="Algorithm" value={config.training.algorithm} onChange={(v) => updateField('training', 'algorithm', v)} />
         <ConfigField label="Total Episodes" type="number" value={config.training.total_episodes} onChange={(v) => updateField('training', 'total_episodes', parseInt(v))} />
-        <ConfigField label="Max Steps/Episode" type="number" value={config.training.max_steps_per_episode} onChange={(v) => updateField('training', 'max_steps_per_episode', parseInt(v))} />
+        <ConfigField label="Measured Simulated Seconds" type="number" value={config.sumo.num_seconds} onChange={(v) => updateField('sumo', 'num_seconds', parseInt(v))} />
         <ConfigField label="Batch Size" type="number" value={config.training.batch_size} onChange={(v) => updateField('training', 'batch_size', parseInt(v))} />
         <ConfigField label="Learning Rate" type="number" step="0.0001" value={config.training.learning_rate} onChange={(v) => updateField('training', 'learning_rate', parseFloat(v))} />
         <ConfigField label="Gamma" type="number" step="0.01" value={config.training.gamma} onChange={(v) => updateField('training', 'gamma', parseFloat(v))} />
@@ -130,9 +130,9 @@ export default function Config() {
       {config.environment?.reward_weights && (
         <ConfigSection title="Reward Weights">
           <ConfigField label="Queue Weight" type="number" step="0.05" value={config.environment.reward_weights.queue_weight} onChange={(v) => updateRewardWeight('queue_weight', parseFloat(v))} />
-          <ConfigField label="Waiting Time Weight" type="number" step="0.05" value={config.environment.reward_weights.waiting_time_weight} onChange={(v) => updateRewardWeight('waiting_time_weight', parseFloat(v))} />
+          <ConfigField label="Lane waiting snapshot weight" type="number" step="0.05" value={config.environment.reward_weights.waiting_time_weight} onChange={(v) => updateRewardWeight('waiting_time_weight', parseFloat(v))} />
           <ConfigField label="Emergency Weight" type="number" step="0.05" value={config.environment.reward_weights.emergency_weight} onChange={(v) => updateRewardWeight('emergency_weight', parseFloat(v))} />
-          <ConfigField label="Throughput Bonus" type="number" step="0.01" value={config.environment.reward_weights.throughput_bonus || 0} onChange={(v) => updateRewardWeight('throughput_bonus', parseFloat(v))} />
+          <ConfigField label="Incoming-count Decrease Proxy Bonus" type="number" step="0.01" value={config.environment.reward_weights.incoming_count_decrease_bonus ?? config.environment.reward_weights.throughput_bonus ?? 0} onChange={(v) => updateRewardWeight('incoming_count_decrease_bonus', parseFloat(v))} />
           <ConfigField label="Switch Penalty" type="number" step="0.01" value={config.environment.reward_weights.switch_penalty || 0} onChange={(v) => updateRewardWeight('switch_penalty', parseFloat(v))} />
           <ConfigField label="Congestion Penalty" type="number" step="0.05" value={config.environment.reward_weights.congestion_penalty || 0} onChange={(v) => updateRewardWeight('congestion_penalty', parseFloat(v))} />
         </ConfigSection>
@@ -141,10 +141,13 @@ export default function Config() {
       {/* SUMO section */}
       <ConfigSection title="SUMO">
         <ConfigField label="Config File" value={config.sumo.cfg_file} onChange={(v) => updateField('sumo', 'cfg_file', v)} />
-        <ConfigField label="Delta Time" type="number" value={config.sumo.delta_time} onChange={(v) => updateField('sumo', 'delta_time', parseInt(v))} />
+        <ConfigField label="Decision Interval (s)" type="number" value={config.sumo.delta_time} onChange={(v) => updateField('sumo', 'delta_time', parseInt(v))} />
         <ConfigField label="Min Green" type="number" value={config.sumo.min_green} onChange={(v) => updateField('sumo', 'min_green', parseInt(v))} />
         <ConfigField label="Max Green" type="number" value={config.sumo.max_green} onChange={(v) => updateField('sumo', 'max_green', parseInt(v))} />
-        <ConfigField label="Density Multiplier" type="number" step="0.25" value={config.sumo.density_multiplier} onChange={(v) => updateField('sumo', 'density_multiplier', parseFloat(v))} />
+        <ConfigField label="Warm-up Seconds" type="number" value={config.sumo.warmup_seconds ?? 5} onChange={(v) => updateField('sumo', 'warmup_seconds', parseInt(v))} />
+        <ConfigField label="Minimum Yellow Seconds" type="number" value={config.sumo.yellow_time} onChange={(v) => updateField('sumo', 'yellow_time', parseInt(v))} />
+        <ConfigField label="All-red Seconds" type="number" value={config.sumo.all_red_time ?? 1} onChange={(v) => updateField('sumo', 'all_red_time', parseInt(v))} />
+        <p className="text-sm text-slate-400">Select an explicit demand configuration for density changes.</p>
       </ConfigSection>
     </div>
   )

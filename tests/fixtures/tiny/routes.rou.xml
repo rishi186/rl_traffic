@@ -1,0 +1,9 @@
+<routes>
+  <vType id="car" sigma="0.5"/>
+  <route id="ns" edges="NC CS"/>
+  <route id="ew" edges="EC CW"/>
+  <vehicle id="a" type="car" route="ns" depart="0"/>
+  <vehicle id="b" type="car" route="ew" depart="1"/>
+  <vehicle id="c" type="car" route="ns" depart="2"/>
+  <vehicle id="d" type="car" route="ew" depart="3"/>
+</routes>

@@ -1,0 +1,6 @@
+<configuration>
+    <input>
+        <net-file value="tirupati.net.xml.gz"/>
+        <route-files value="tirupati.rou.xml"/>
+    </input>
+</configuration>

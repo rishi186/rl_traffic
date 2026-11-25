@@ -1,340 +1,224 @@
-"""Multi-agent SUMO environment for RL-based traffic signal control.
+"""Multi-agent SUMO environment with explicit seconds and lawful cyclic control.
 
-Provides a Gymnasium-compatible interface where each traffic light acts as
-an independent agent.  Supports multiple reward types including a custom
-shaped reward penalising queue length, cumulative waiting time, and
-emergency-vehicle delay.
-
-Features:
-    - Per-lane vehicle density & count in the observation vector
-    - Emergency vehicle detection via ``traci.vehicle.getVehicleClass``
-    - Runtime density scaling through a ``density_multiplier`` config knob
+Legacy lane features/reward options are retained for compatible networks.
+Evaluation uses network accounting and TripInfo, never these reward proxies.
 """
+import tempfile
+from pathlib import Path
+from typing import Dict, List, Optional
 
-import random
 import numpy as np
 import traci
-from typing import Dict, Tuple, List, Optional, Any
+from traci import constants as tc
 import gymnasium as gym
 from gymnasium import spaces
 
-from src.utils.logger import get_logger
+from src.environment.timing import EpisodeTiming
+from src.environment.episode_metrics import planned_demand, tripinfo_summary
 
-logger = get_logger(__name__)
-
-
-# ======================================================================
-# Environment
-# ======================================================================
 
 class MultiAgentSumoEnv(gym.Env):
-    """Multi-agent SUMO environment for traffic signal control.
-
-    Each traffic light is an independent agent that chooses to **keep** or
-    **switch** its current green phase every ``delta_time`` seconds.
-
-    Args:
-        config: Full experiment configuration dictionary.
-    """
-
-    def __init__(self, config: dict) -> None:
+    def __init__(self, config):
         super().__init__()
         self.config = config
-        self.sumo_cfg: str = config["sumo"]["cfg_file"]
-        self.use_gui: bool = config["sumo"]["use_gui"]
-        self.delta_time: int = config["sumo"]["delta_time"]
-        self.yellow_time: int = config["sumo"]["yellow_time"]
-        self.min_green: int = config["sumo"]["min_green"]
-        self.max_green: int = config["sumo"]["max_green"]
-        self.max_steps: int = config["training"]["max_steps_per_episode"]
-        self.reward_type: str = config["environment"]["reward_type"]
-        self.density_multiplier: float = config["sumo"].get("density_multiplier", 1.0)
+        s = config['sumo']
+        self.timing = EpisodeTiming.from_config(config)
+        self.sumo_cfg = s['cfg_file']
+        self.use_gui = s.get('use_gui', False)
+        self.delta_time = self.timing.decision_s
+        self.yellow_time = s['yellow_time']
+        self.min_green, self.max_green = s['min_green'], s['max_green']
+        self.control_mode = s.get('control_mode', 'rl')
+        if self.control_mode not in ('rl', 'fixed', 'actuated'):
+            raise ValueError('Unknown control mode')
+        if s.get('density_multiplier', 1) != 1:
+            raise ValueError('Generate complete demand files; runtime density deletion/cloning is disabled')
+        signal_times = (self.min_green, self.max_green, self.yellow_time, s.get('all_red_time', 1))
+        if any(not isinstance(x, int) or x < 1 for x in signal_times) or self.max_green < self.min_green:
+            raise ValueError('Invalid signal timing')
+        self.reward_type = config['environment']['reward_type']
+        rw = config['environment'].get('reward_weights', {})
+        for key, default in [('queue_weight', .4), ('waiting_time_weight', .4), ('emergency_weight', .2),
+                             ('throughput_bonus', 0), ('switch_penalty', 0), ('congestion_penalty', 0),
+                             ('congestion_threshold', .8)]:
+            setattr(self, key, rw.get('incoming_count_decrease_bonus', rw.get(key, default)) if key == 'throughput_bonus' else rw.get(key, default))
+        self.sumo_running = False
+        self.ts_ids, self.agents = [], {}
+        self.observation_space = self.action_space = None
+        self.max_lanes = self.max_phases = self.current_step = 0
+        self._temp = tempfile.TemporaryDirectory(prefix='rl-traffic-')
+        self.tripinfo_path = str(Path(self._temp.name) / 'tripinfo.xml')
+        self.seed = config['experiment']['seed']
 
-        # Reward weights for custom-shaped reward
-        rw = config["environment"].get("reward_weights", {})
-        self.queue_weight: float = rw.get("queue_weight", 0.4)
-        self.waiting_time_weight: float = rw.get("waiting_time_weight", 0.4)
-        self.emergency_weight: float = rw.get("emergency_weight", 0.2)
-        self.throughput_bonus: float = rw.get("throughput_bonus", 0.0)
-        self.switch_penalty: float = rw.get("switch_penalty", 0.0)
-        self.congestion_penalty: float = rw.get("congestion_penalty", 0.0)
-        self.congestion_threshold: float = rw.get("congestion_threshold", 0.8)
+    def start_sumo(self):
+        cmd = ['sumo-gui' if self.use_gui else 'sumo', '-c', str(self.sumo_cfg),
+               '--seed', str(self.seed), '--begin', str(self.timing.begin_s), '--step-length', '1',
+               '--waiting-time-memory', '10000', '--time-to-teleport', '-1',
+               '--no-step-log', 'true', '--duration-log.disable', 'true',
+               '--tripinfo-output', self.tripinfo_path, '--tripinfo-output.write-unfinished', 'true',
+               '--tripinfo-output.write-undeparted', 'true']
+        traci.start(cmd)
+        self.sumo_running = True
 
-        # Multi-agent parameter sharing
-        self.num_agents: int = 0
-        self.agent_id_map: Dict[str, int] = {}
-
-        self.sumo_running: bool = False
-        self.ts_ids: List[str] = []
-        self.agents: Dict[str, "TrafficSignalAgent"] = {}
-        self.current_step: int = 0
-        self._prev_actions: Dict[str, int] = {}
-        self._prev_throughput: int = 0
-
-        self.observation_space: Optional[spaces.Box] = None
-        self.action_space: Optional[spaces.Discrete] = None
-
-        self.max_lanes: int = 0
-        self.max_phases: int = 0
-
-    # ------------------------------------------------------------------
-    # SUMO lifecycle
-    # ------------------------------------------------------------------
-
-    def start_sumo(self) -> None:
-        """Start the SUMO simulation process via TraCI.
-
-        Raises:
-            RuntimeError: If SUMO fails to start after retries.
-        """
-        sumo_binary = "sumo-gui" if self.use_gui else "sumo"
-        sumo_cmd = [
-            sumo_binary,
-            "-c", self.sumo_cfg,
-            "--waiting-time-memory", "10000",
-            "--time-to-teleport", "-1",
-            "--no-step-log", "true",
-            "--no-warnings", "true",
-            "--duration-log.disable", "true",
-        ]
-
-        max_retries = 3
-        for attempt in range(1, max_retries + 1):
-            try:
-                traci.start(sumo_cmd)
-                self.sumo_running = True
-                logger.info("SUMO started (attempt %d) | cfg=%s", attempt, self.sumo_cfg)
-                return
-            except Exception as exc:
-                logger.warning("SUMO start attempt %d failed: %s", attempt, exc)
-                if attempt == max_retries:
-                    raise RuntimeError(
-                        f"Failed to start SUMO after {max_retries} attempts"
-                    ) from exc
-
-    def _get_traffic_lights(self) -> None:
-        """Discover traffic lights and build per-signal agent wrappers."""
-        self.ts_ids = list(traci.trafficlight.getIDList())
-        logger.info("Found %d traffic lights", len(self.ts_ids))
-
-        temp_agents: List["TrafficSignalAgent"] = []
-        for ts_id in self.ts_ids:
-            agent = TrafficSignalAgent(
-                ts_id,
-                self.delta_time,
-                self.yellow_time,
-                self.min_green,
-                self.max_green,
-            )
-            temp_agents.append(agent)
-            self.max_lanes = max(self.max_lanes, len(agent.incoming_lanes))
-            self.max_phases = max(self.max_phases, len(agent.green_phases))
-
-        logger.info(
-            "Max lanes=%d | Max green phases=%d", self.max_lanes, self.max_phases
-        )
-
-        for agent in temp_agents:
-            agent.max_lanes = self.max_lanes
-            agent.max_phases = self.max_phases
-            self.agents[agent.id] = agent
-
-        # Build agent ID map for parameter sharing
+    def _get_traffic_lights(self):
+        self.ts_ids = sorted(traci.trafficlight.getIDList())
+        if not self.ts_ids:
+            raise ValueError('No traffic lights in network')
+        self.agents = {tid: TrafficSignalAgent(tid, self.delta_time, self.yellow_time,
+                       self.min_green, self.max_green) for tid in self.ts_ids}
+        for agent in self.agents.values():
+            agent.configure_program(self.control_mode, self.config['sumo'].get('all_red_time', 1))
+        self.max_lanes = max(len(a.incoming_lanes) for a in self.agents.values())
+        self.max_phases = max(len(a.green_phases) for a in self.agents.values())
+        for agent in self.agents.values():
+            agent.max_lanes, agent.max_phases = self.max_lanes, self.max_phases
         self.num_agents = len(self.ts_ids)
-        self.agent_id_map = {ts_id: i for i, ts_id in enumerate(self.ts_ids)}
+        self.agent_id_map = {tid: i for i, tid in enumerate(self.ts_ids)}
+        self.controlled_lanes = sorted({lane for a in self.agents.values() for lane in a.incoming_lanes})
+        lane_variables = [tc.LAST_STEP_VEHICLE_HALTING_NUMBER, tc.LAST_STEP_MEAN_SPEED,
+                          tc.VAR_WAITING_TIME, tc.LAST_STEP_VEHICLE_NUMBER, tc.LAST_STEP_VEHICLE_ID_LIST]
+        for lane in self.controlled_lanes:
+            traci.lane.subscribe(lane, lane_variables)
+        for tid in self.ts_ids:
+            traci.trafficlight.subscribe(tid, [tc.TL_RED_YELLOW_GREEN_STATE])
+        self.observation_schema = {
+            'version': 2, 'signals': self.ts_ids,
+            'lanes_by_signal': {tid: a.incoming_lanes for tid, a in self.agents.items()},
+            'green_states_by_signal': {tid: [a.phases[i].state for i in a.green_phases] for tid, a in self.agents.items()},
+            'lane_features': ['queue/20', 'speed/15', 'lane_wait_snapshot/100', 'density/0.5', 'count/30'],
+            'normalization': {'queue': 20, 'speed': 15, 'lane_wait_snapshot': 100,
+                              'density': .5, 'count': 30, 'green_elapsed': self.max_green},
+            'padding': 'zeros to max_lanes; green phase onehot to max_phases',
+            'elapsed': 'green_elapsed_seconds/max_green, clipped at 1',
+            'max_lanes': self.max_lanes, 'max_phases': self.max_phases,
+            'action_schema': '0 hold, 1 request next cyclic green; safety constraints may override',
+        }
 
-    def _apply_density_scaling(self) -> None:
-        """Scale traffic density at runtime via TraCI.
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
+        self.seed = self.config['experiment']['seed'] if seed is None else int(seed)
+        self.close()
+        self.arrived_total = self.departed_total = self.arrived_window = 0
+        self.stopped_vehicle_seconds = self.controlled_queue_seconds = 0
+        self.elapsed_seconds = self.current_step = 0
+        self.timeline, self.action_log = [], []
+        self._finished = False
+        self.demand_ids = planned_demand(self.sumo_cfg, self.timing.end_s, self.timing.begin_s)
+        try:
+            self.start_sumo()
+            self._get_traffic_lights()
+            for _ in range(self.timing.warmup_s):
+                self._tick(measure=False)
+            obs = self._get_observations()
+            self.observation_space = spaces.Box(0, 1, shape=obs[self.ts_ids[0]].shape, dtype=np.float32)
+            self.action_space = spaces.Discrete(2)
+            return obs, {tid: {} for tid in self.ts_ids}
+        except BaseException:
+            self.close()
+            raise
 
-        For multipliers < 1.0, randomly removes a fraction of queued
-        vehicles.  For multipliers > 1.0, duplicates a fraction of
-        departing vehicles with slight offset.
-        """
-        if abs(self.density_multiplier - 1.0) < 1e-3:
-            return
+    def _tick(self, measure):
+        if self.control_mode == 'rl':
+            for a in self.agents.values():
+                a.before_tick()
+        traci.simulationStep()
+        self.arrived_total += traci.simulation.getArrivedNumber()
+        self.departed_total += traci.simulation.getDepartedNumber()
+        for vid in traci.simulation.getDepartedIDList():
+            traci.vehicle.subscribe(vid, [tc.VAR_SPEED, tc.VAR_VEHICLECLASS, tc.VAR_WAITING_TIME])
+        if self.control_mode == 'rl':
+            for a in self.agents.values():
+                a.after_tick()
+        if measure:
+            self.arrived_window += traci.simulation.getArrivedNumber()
+            stopped = sum(x.get(tc.VAR_SPEED, 1) <= .1
+                          for x in traci.vehicle.getAllSubscriptionResults().values())
+            lanes = traci.lane.getAllSubscriptionResults()
+            halting = tc.LAST_STEP_VEHICLE_HALTING_NUMBER
+            queue = sum(lanes[lane][halting] for lane in self.controlled_lanes)
+            self.stopped_vehicle_seconds += stopped
+            self.controlled_queue_seconds += queue
+            self.elapsed_seconds += 1
+            if self.config['sumo'].get('record_timeline', False):
+                signals = traci.trafficlight.getAllSubscriptionResults()
+                self.timeline.append({
+                    'simulated_second': traci.simulation.getTime(),
+                    'elapsed_s': self.elapsed_seconds, 'network_stopped': stopped,
+                    'controlled_lane_queue': queue, 'arrived_cumulative': self.arrived_total,
+                    'signals': {tid: {
+                        'state': signals[tid][tc.TL_RED_YELLOW_GREEN_STATE],
+                        'queue': sum(lanes[lane][halting] for lane in a.incoming_lanes)}
+                        for tid, a in self.agents.items()}})
 
-        vehicle_ids = list(traci.vehicle.getIDList())
-        if not vehicle_ids:
-            return
+    def step(self, actions):
+        if self._finished or not self.sumo_running:
+            raise RuntimeError('reset required before step')
+        previous = self._get_metrics()
+        start_arrived = self.arrived_total
+        for tid, a in self.agents.items():
+            a.applied_action = 0
+            if self.control_mode == 'rl':
+                a.set_action(actions.get(tid, 0))
+        remaining = min(self.delta_time, self.timing.horizon_s - self.elapsed_seconds)
+        for _ in range(remaining):
+            self._tick(measure=True)
+            if self.config['sumo'].get('terminate_when_empty', False) and traci.simulation.getMinExpectedNumber() == 0:
+                break
+        self.current_step += 1
+        current = self._get_metrics()
+        applied = {tid: a.applied_action for tid, a in self.agents.items()}
+        rewards = self._calculate_rewards(previous, current, applied)
+        natural = traci.simulation.getMinExpectedNumber() == 0
+        at_limit = self.elapsed_seconds >= self.timing.horizon_s
+        terminal = natural and (at_limit or self.config['sumo'].get('terminate_when_empty', False))
+        truncated = at_limit and not terminal
+        self._finished = terminal or truncated
+        dones = {tid: terminal for tid in self.ts_ids + ['__all__']}
+        truncs = {tid: truncated for tid in self.ts_ids + ['__all__']}
+        infos = {tid: {
+            **current[tid], 'requested_action': actions.get(tid, 0),
+            'applied_action': applied[tid], 'simulated_second': traci.simulation.getTime()}
+            for tid in self.ts_ids}
+        infos['__network__'] = {'arrivals_this_decision': self.arrived_total - start_arrived,
+                                'arrivals_total': self.arrived_total, 'elapsed_s': self.elapsed_seconds}
+        self.action_log.append({'elapsed_s': self.elapsed_seconds, 'requested': dict(actions), 'applied': applied})
+        return self._get_observations(), rewards, dones, truncs, infos
 
-        if self.density_multiplier < 1.0:
-            # Remove vehicles to reduce density
-            remove_frac = 1.0 - self.density_multiplier
-            to_remove = random.sample(
-                vehicle_ids, k=int(len(vehicle_ids) * remove_frac)
-            )
-            for vid in to_remove:
-                try:
-                    traci.vehicle.remove(vid)
-                except traci.exceptions.TraCIException:
-                    pass
-            logger.debug(
-                "Density scaling: removed %d / %d vehicles (multiplier=%.2f)",
-                len(to_remove), len(vehicle_ids), self.density_multiplier,
-            )
-        else:
-            # Clone vehicles to increase density
-            clone_frac = self.density_multiplier - 1.0
-            to_clone = random.sample(
-                vehicle_ids,
-                k=min(int(len(vehicle_ids) * clone_frac), len(vehicle_ids)),
-            )
-            cloned = 0
-            for vid in to_clone:
-                try:
-                    route = traci.vehicle.getRouteID(vid)
-                    new_id = f"{vid}_clone_{cloned}"
-                    traci.vehicle.add(new_id, route)
-                    cloned += 1
-                except traci.exceptions.TraCIException:
-                    pass
-            logger.debug(
-                "Density scaling: cloned %d vehicles (multiplier=%.2f)",
-                cloned, self.density_multiplier,
-            )
+    def _get_observations(self):
+        return {tid: np.asarray(a.get_observation(), dtype=np.float32) for tid, a in self.agents.items()}
 
-    # ------------------------------------------------------------------
-    # Gymnasium interface
-    # ------------------------------------------------------------------
+    def _get_metrics(self):
+        return {tid: {'waiting_time': a.get_waiting_time(), 'queue': a.get_queue_length(),
+                      'pressure': a.get_pressure(), 'emergency_waiting': a.get_emergency_waiting_time(),
+                      'vehicle_count': a.get_vehicle_count(), 'density': a.get_density()}
+                for tid, a in self.agents.items()}
 
-    def reset(self, seed: Optional[int] = None) -> Tuple[Dict[str, np.ndarray], Dict[str, dict]]:
-        """Reset the environment and return initial observations.
+    def episode_summary(self):
+        if self.sumo_running:
+            raise RuntimeError('Close SUMO to flush TripInfo before reading summary')
+        return {**tripinfo_summary(self.tripinfo_path, self.demand_ids),
+                'seed': self.seed, 'simulated_seconds': self.elapsed_seconds,
+                'warmup_seconds': self.timing.warmup_s,
+                'window_begin_s': self.timing.window_begin_s,
+                'window_end_s': self.timing.window_begin_s + self.elapsed_seconds,
+                'arrivals_network_total': self.arrived_total,
+                'arrivals_network_window': self.arrived_window,
+                'departures_network_total': self.departed_total,
+                'network_stopped_vehicle_seconds': self.stopped_vehicle_seconds,
+                'controlled_lane_queue_mean': self.controlled_queue_seconds / max(1, self.elapsed_seconds)}
 
-        Args:
-            seed: Optional random seed for reproducibility.
+    def __enter__(self):
+        return self
 
-        Returns:
-            Tuple of (observations dict, infos dict).
-        """
-        if seed is not None:
-            np.random.seed(seed)
-            random.seed(seed)
+    def __exit__(self, *args):
+        self.close()
 
+    def close(self):
         if self.sumo_running:
             try:
                 traci.close()
-            except traci.exceptions.FatalTraCIError:
-                pass
-            self.sumo_running = False
-
-        self.start_sumo()
-        self._get_traffic_lights()
-        self.current_step = 0
-
-        # Run a few steps so vehicles populate the network for density scaling
-        for _ in range(5):
-            traci.simulationStep()
-        self._apply_density_scaling()
-
-        if self.observation_space is None:
-            sample_obs = self._get_observations()
-            obs_dim = len(sample_obs[self.ts_ids[0]])
-            logger.info("Observation dimension (fixed): %d", obs_dim)
-            self.observation_space = spaces.Box(
-                low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32
-            )
-            self.action_space = spaces.Discrete(2)
-
-        self._prev_actions = {ts_id: 0 for ts_id in self.ts_ids}
-        self._prev_throughput = traci.simulation.getArrivedNumber()
-
-        observations = self._get_observations()
-        infos: Dict[str, dict] = {ts_id: {} for ts_id in self.ts_ids}
-        return observations, infos
-
-    def step(
-        self, actions: Dict[str, int]
-    ) -> Tuple[Dict[str, np.ndarray], Dict[str, float], Dict[str, bool], Dict[str, bool], Dict[str, dict]]:
-        """Execute one environment step.
-
-        Args:
-            actions: Mapping from traffic-light ID to action (0=keep, 1=switch).
-
-        Returns:
-            (observations, rewards, dones, truncateds, infos)
-        """
-        previous_metrics = self._get_metrics()
-
-        for ts_id, action in actions.items():
-            self.agents[ts_id].set_action(action)
-
-        for _ in range(self.delta_time):
-            traci.simulationStep()
-
-        self.current_step += 1
-
-        observations = self._get_observations()
-        current_metrics = self._get_metrics()
-        rewards = self._calculate_rewards(previous_metrics, current_metrics, actions)
-
-        sim_done = traci.simulation.getMinExpectedNumber() <= 0
-        done = (self.current_step >= self.max_steps) or sim_done
-        dones: Dict[str, bool] = {ts_id: done for ts_id in self.ts_ids}
-        dones["__all__"] = done
-
-        truncateds: Dict[str, bool] = {ts_id: False for ts_id in self.ts_ids}
-        truncateds["__all__"] = False
-
-        # Compute throughput delta for info
-        current_throughput = traci.simulation.getArrivedNumber()
-        throughput_delta = current_throughput - self._prev_throughput
-        self._prev_throughput = current_throughput
-
-        infos: Dict[str, dict] = {
-            ts_id: {
-                "waiting_time": current_metrics[ts_id]["waiting_time"],
-                "queue": current_metrics[ts_id]["queue"],
-                "emergency_waiting": current_metrics[ts_id]["emergency_waiting"],
-                "vehicle_count": current_metrics[ts_id]["vehicle_count"],
-                "density": current_metrics[ts_id]["density"],
-                "pressure": current_metrics[ts_id]["pressure"],
-                "throughput_delta": throughput_delta,
-            }
-            for ts_id in self.ts_ids
-        }
-
-        self._prev_actions = dict(actions)
-
-        return observations, rewards, dones, truncateds, infos
-
-    # ------------------------------------------------------------------
-    # Observations & metrics
-    # ------------------------------------------------------------------
-
-    def _get_observations(self) -> Dict[str, np.ndarray]:
-        """Collect observation vectors for every traffic-light agent.
-
-        Returns:
-            Dict mapping traffic-light ID to its observation array.
-        """
-        observations: Dict[str, np.ndarray] = {}
-        for ts_id in self.ts_ids:
-            obs = self.agents[ts_id].get_observation()
-            observations[ts_id] = np.array(obs, dtype=np.float32)
-        return observations
-
-    def _get_metrics(self) -> Dict[str, Dict[str, float]]:
-        """Collect current metrics for all traffic lights.
-
-        Returns:
-            Nested dict of per-signal metrics.
-        """
-        metrics: Dict[str, Dict[str, float]] = {}
-        for ts_id in self.ts_ids:
-            agent = self.agents[ts_id]
-            metrics[ts_id] = {
-                "waiting_time": agent.get_waiting_time(),
-                "queue": agent.get_queue_length(),
-                "pressure": agent.get_pressure(),
-                "emergency_waiting": agent.get_emergency_waiting_time(),
-                "vehicle_count": agent.get_vehicle_count(),
-                "density": agent.get_density(),
-            }
-        return metrics
-
-    # ------------------------------------------------------------------
-    # Reward computation
-    # ------------------------------------------------------------------
+            finally:
+                self.sumo_running = False
 
     def _calculate_rewards(
         self,
@@ -379,10 +263,8 @@ class MultiAgentSumoEnv(gym.Env):
                 emerg_penalty = -self.emergency_weight * current[ts_id]["emergency_waiting"]
                 reward = queue_penalty + wait_penalty + emerg_penalty
 
-                # Throughput bonus: reward vehicles that cleared the intersection
+                # Legacy throughput_bonus is an incoming-count decrease proxy, not throughput.
                 if self.throughput_bonus > 0:
-                    # Actually, throughput is about vehicles leaving, not arriving
-                    # Use the difference in pressure as a proxy
                     pressure_delta = previous[ts_id]["pressure"] - current[ts_id]["pressure"]
                     reward += self.throughput_bonus * max(0, pressure_delta)
 
@@ -403,30 +285,6 @@ class MultiAgentSumoEnv(gym.Env):
 
         return rewards
 
-    # ------------------------------------------------------------------
-    # Context manager support
-    # ------------------------------------------------------------------
-
-    def __enter__(self) -> "MultiAgentSumoEnv":
-        return self
-
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        self.close()
-
-    def close(self) -> None:
-        """Shut down the SUMO simulation cleanly."""
-        if self.sumo_running:
-            try:
-                traci.close()
-            except traci.exceptions.FatalTraCIError:
-                pass
-            self.sumo_running = False
-            logger.info("SUMO simulation closed")
-
-
-# ======================================================================
-# Per-signal agent wrapper
-# ======================================================================
 
 class TrafficSignalAgent:
     """Wrapper around a single SUMO traffic light for observation/action logic.
@@ -462,7 +320,7 @@ class TrafficSignalAgent:
         self.max_phases: int = 0
 
         # Discover controlled lanes
-        self.lanes: List[str] = list(set(traci.trafficlight.getControlledLanes(self.id)))
+        self.lanes: List[str] = sorted(set(traci.trafficlight.getControlledLanes(self.id)))
 
         self.incoming_lanes: List[str] = []
         for lane in self.lanes:
@@ -486,42 +344,82 @@ class TrafficSignalAgent:
             if "y" not in phase.state.lower() and ("G" in phase.state or "g" in phase.state):
                 self.green_phases.append(i)
 
-        if len(self.green_phases) == 0:
-            self.green_phases = list(range(len(self.phases)))
+        if not self.green_phases:
+            raise ValueError(f"No legal green phases: {self.id}")
+        self.phase_index = self.green_phases[0]
+        self.remaining = 0
+        self.applied_action = 0
 
-    # ------------------------------------------------------------------
-    # Action
-    # ------------------------------------------------------------------
+    def configure_program(self, mode, all_red_time):
+        """Preserve network phase order, yellow >= configured minimum, insert all-red.
 
-    def set_action(self, action: int) -> None:
-        """Apply an action to this traffic light.
-
-        Args:
-            action: 0 = keep current phase, 1 = switch to next green phase.
+        Branching programs are rejected instead of guessing a legal transition.
+        All policies get the same clearance plan; fixed keeps original green
+        durations clipped to min/max, actuated uses SUMO's gap controller.
         """
-        if action == 1 and self.time_since_last_phase_change >= self.min_green:
-            self._set_yellow_phase()
+        phases = []
+        for i, phase in enumerate(self.phases):
+            if phase.next and tuple(phase.next) != ((i + 1) % len(self.phases),):
+                raise ValueError(f"Branching signal program unsupported: {self.id}")
+        for index in self.green_phases:
+            phase = self.phases[index]
+            duration = max(self.min_green, min(self.max_green, phase.duration))
+            phases.append(traci.trafficlight.Phase(duration, phase.state,
+                          minDur=self.min_green, maxDur=self.max_green))
+            # Every released green gets yellow before all-red, including
+            # permissive greens that legacy programs carried through clearance.
+            yellow = ''.join('y' if c in 'Gg' else 'r' for c in phase.state)
+            following = self.phases[(index + 1) % len(self.phases)]
+            yellow_s = max(self.yellow_time, following.duration if 'y' in following.state.lower() else 0)
+            phases.append(traci.trafficlight.Phase(yellow_s, yellow))
+            if all_red_time:
+                phases.append(traci.trafficlight.Phase(all_red_time, 'r' * len(phase.state)))
+        self.phases = phases
+        self.green_phases = [i for i, p in enumerate(phases) if 'y' not in p.state.lower() and any(c in 'gG' for c in p.state)]
+        for i in self.green_phases:
+            following = phases[(i + 1) % len(phases)]
+            # Green-to-green sequences can add permissions without conflict,
+            # but are deliberately unsupported by this binary cyclic controller.
+            if 'y' not in following.state.lower():
+                raise ValueError(f"Missing yellow after green: {self.id} phase {i}")
+        logic_type = 3 if mode == 'actuated' else 0
+        logic = traci.trafficlight.Logic('benchmark', logic_type, self.green_phases[0], phases)
+        traci.trafficlight.setProgramLogic(self.id, logic)
+        traci.trafficlight.setProgram(self.id, 'benchmark')
+        self.phase_index = self.green_phases[0]
+        traci.trafficlight.setPhase(self.id, self.phase_index)
+        if mode == 'rl':
+            traci.trafficlight.setPhaseDuration(self.id, 1e6)
+
+    def set_action(self, action):
+        if action not in (0, 1):
+            raise ValueError('Expected binary hold/switch request')
+        if action and not self.is_yellow and self.time_since_last_phase_change >= self.min_green:
+            self._advance_phase()
+
+    def _advance_phase(self):
+        leaving_green = not self.is_yellow
+        self.phase_index = (self.phase_index + 1) % len(self.phases)
+        self.is_yellow = self.phase_index not in self.green_phases
+        self.remaining = int(np.ceil(self.phases[self.phase_index].duration)) if self.is_yellow else 0
+        if leaving_green:
+            self.applied_action = 1
+        if not self.is_yellow:
+            self.time_since_last_phase_change = 0
+        traci.trafficlight.setPhase(self.id, self.phase_index)
+        traci.trafficlight.setPhaseDuration(self.id, 1e6)
+
+    def before_tick(self):
+        if self.is_yellow and self.remaining == 0:
+            self._advance_phase()
+        elif not self.is_yellow and self.time_since_last_phase_change >= self.max_green:
+            self._advance_phase()
+
+    def after_tick(self):
+        if self.is_yellow:
+            self.remaining -= 1
         else:
-            self.time_since_last_phase_change += self.delta_time
-
-    def _set_yellow_phase(self) -> None:
-        """Transition through a yellow phase before the next green phase."""
-        current_phase = traci.trafficlight.getPhase(self.id)
-
-        try:
-            current_idx = self.green_phases.index(current_phase)
-            next_idx = (current_idx + 1) % len(self.green_phases)
-            next_green = self.green_phases[next_idx]
-        except ValueError:
-            next_green = self.green_phases[0]
-
-        if current_phase + 1 < len(self.phases):
-            traci.trafficlight.setPhase(self.id, current_phase + 1)
-
-        self.next_action_time = self.yellow_time
-        self.green_phase = next_green
-        self.is_yellow = True
-        self.time_since_last_phase_change = 0
+            self.time_since_last_phase_change += 1
 
     # ------------------------------------------------------------------
     # Observation  (enhanced feature engineering)
@@ -534,7 +432,7 @@ class TrafficSignalAgent:
             1. Queue length (normalised)
             2. Average speed (normalised)
             3. Waiting time (normalised)
-            4. Vehicle density — vehicles / lane length (normalised)
+            4. Vehicle density â€” vehicles / lane length (normalised)
             5. Vehicle count (normalised)
 
         Plus global features:
@@ -563,17 +461,18 @@ class TrafficSignalAgent:
             if i < len(self.incoming_lanes):
                 lane = self.incoming_lanes[i]
 
-                queue = traci.lane.getLastStepHaltingNumber(lane)
+                snapshot = traci.lane.getSubscriptionResults(lane)
+                queue = snapshot[tc.LAST_STEP_VEHICLE_HALTING_NUMBER]
                 obs.append(min(queue / max_queue, 1.0))
 
-                speed = traci.lane.getLastStepMeanSpeed(lane)
+                speed = snapshot[tc.LAST_STEP_MEAN_SPEED]
                 obs.append(min(max(speed / max_speed, 0.0), 1.0))
 
-                waiting = traci.lane.getWaitingTime(lane)
+                waiting = snapshot[tc.VAR_WAITING_TIME]
                 obs.append(min(waiting / max_waiting, 1.0))
 
                 # Vehicle density (vehicles / lane_length)
-                veh_count = traci.lane.getLastStepVehicleNumber(lane)
+                veh_count = snapshot[tc.LAST_STEP_VEHICLE_NUMBER]
                 lane_len = self._lane_lengths.get(lane, 100.0)
                 density = veh_count / lane_len
                 obs.append(min(density / max_density, 1.0))
@@ -604,6 +503,9 @@ class TrafficSignalAgent:
     # Metric helpers
     # ------------------------------------------------------------------
 
+    def _lane_value(self, lane, variable):
+        return traci.lane.getSubscriptionResults(lane)[variable]
+
     def get_queue_length(self) -> int:
         """Total number of halting vehicles across incoming lanes.
 
@@ -611,16 +513,16 @@ class TrafficSignalAgent:
             Integer queue length.
         """
         return sum(
-            traci.lane.getLastStepHaltingNumber(lane) for lane in self.incoming_lanes
+            self._lane_value(lane, tc.LAST_STEP_VEHICLE_HALTING_NUMBER) for lane in self.incoming_lanes
         )
 
     def get_waiting_time(self) -> float:
-        """Total cumulative waiting time (seconds) across incoming lanes.
+        """Controlled incoming-lane waiting snapshot sum (vehicle-seconds); not trip waiting.
 
         Returns:
             Aggregate waiting time.
         """
-        return sum(traci.lane.getWaitingTime(lane) for lane in self.incoming_lanes)
+        return sum(self._lane_value(lane, tc.VAR_WAITING_TIME) for lane in self.incoming_lanes)
 
     def get_pressure(self) -> float:
         """Traffic pressure (incoming vehicle count) for this intersection.
@@ -628,10 +530,7 @@ class TrafficSignalAgent:
         Returns:
             Float pressure value.
         """
-        incoming = sum(
-            traci.lane.getLastStepVehicleNumber(lane) for lane in self.incoming_lanes
-        )
-        return float(incoming)
+        return float(self.get_vehicle_count())
 
     def get_vehicle_count(self) -> int:
         """Total vehicle count across incoming lanes.
@@ -640,7 +539,7 @@ class TrafficSignalAgent:
             Integer vehicle count.
         """
         return sum(
-            traci.lane.getLastStepVehicleNumber(lane) for lane in self.incoming_lanes
+            self._lane_value(lane, tc.LAST_STEP_VEHICLE_NUMBER) for lane in self.incoming_lanes
         )
 
     def get_density(self) -> float:
@@ -653,7 +552,7 @@ class TrafficSignalAgent:
             return 0.0
         total_density = 0.0
         for lane in self.incoming_lanes:
-            count = traci.lane.getLastStepVehicleNumber(lane)
+            count = self._lane_value(lane, tc.LAST_STEP_VEHICLE_NUMBER)
             length = self._lane_lengths.get(lane, 100.0)
             total_density += count / length
         return total_density / len(self.incoming_lanes)
@@ -668,16 +567,10 @@ class TrafficSignalAgent:
             Total emergency-vehicle waiting time (seconds).
         """
         emergency_wait = 0.0
+        vehicles = traci.vehicle.getAllSubscriptionResults()
         for lane in self.incoming_lanes:
-            try:
-                vehicle_ids = traci.lane.getLastStepVehicleIDs(lane)
-                for vid in vehicle_ids:
-                    try:
-                        vclass = traci.vehicle.getVehicleClass(vid)
-                        if vclass == "emergency":
-                            emergency_wait += traci.vehicle.getWaitingTime(vid)
-                    except traci.exceptions.TraCIException:
-                        continue
-            except traci.exceptions.TraCIException:
-                continue
+            for vid in self._lane_value(lane, tc.LAST_STEP_VEHICLE_ID_LIST):
+                vehicle = vehicles.get(vid, {})
+                if vehicle.get(tc.VAR_VEHICLECLASS) == "emergency":
+                    emergency_wait += vehicle[tc.VAR_WAITING_TIME]
         return emergency_wait

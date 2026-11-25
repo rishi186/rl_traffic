@@ -158,13 +158,13 @@ def run_experiment(
 
     # Write temp config
     temp_config_path = os.path.join(run_log_dir, "config.yaml")
-    os.makedirs(run_log_dir, exist_ok=True)
+    os.makedirs(run_log_dir, exist_ok=False)
     with open(temp_config_path, "w") as f:
         yaml.dump(config, f, default_flow_style=False)
 
-    run_train(temp_config_path)
+    actual_log_dir = run_train(temp_config_path)
 
-    return {"run_name": run_name, "log_dir": run_log_dir, "status": "completed"}
+    return {"run_name": run_name, "log_dir": actual_log_dir, "status": "completed"}
 
 
 def run_experiments(
@@ -226,6 +226,47 @@ def run_experiments(
     return results
 
 
+def benchmark_campaign(config_path, profile, output_dir):
+    """Reproducible smoke -> pilot or multi-training-seed publication campaign."""
+    from pathlib import Path
+    from scripts.generate_density_configs import generate
+    from scripts.evaluate_generalization import benchmark
+    from scripts.train import train
+    out = Path(output_dir).resolve()
+    out.mkdir(parents=True, exist_ok=False)
+    c = yaml.safe_load(Path(config_path).read_text())
+    publication = profile == 'publication'
+    horizon = 5000 if publication else (30 if profile == 'smoke' else 300)
+    c['sumo']['num_seconds'] = horizon
+    c['training']['total_episodes'] = 100 if publication else (1 if profile == 'smoke' else 2)
+    c['experiment']['device'] = 'cpu'
+    if not publication:
+        c['training']['batch_size'] = 32
+        c['training']['dqn'].update(hidden_dims=[64, 64], replay_buffer_size=5000)
+        c['training']['ppo']['ppo_epochs'] = 2
+    cfg = out / 'campaign-config.yaml'
+    cfg.write_text(yaml.safe_dump(c, sort_keys=False))
+    demand = generate(cfg, out / 'demand', 42, horizon + c['sumo'].get('warmup_seconds', 5))
+    models = {'dqn': [], 'ppo': []}
+    training_seeds = [42, 43, 44] if publication else [42]
+    for algorithm in models:
+        for seed in training_seeds:
+            run = train(cfg, algorithm=algorithm, seed=seed, run_dir=out / f'{algorithm}-{seed}',
+                        scenario=str(out / 'demand/normal.sumocfg'),
+                        horizon=horizon if publication or profile == 'smoke' else 120,
+                        validation_scenarios=[str(out / 'demand/light.sumocfg')], validation_seeds=[7001])
+            models[algorithm].append(str(Path(run) / 'models/best_model.pth'))
+    benchmark(cfg, demand, models['dqn'], models['ppo'], [101], out / 'smoke',
+              horizon=30, scenarios=['normal'], label='Smoke only — no performance claim')
+    if profile != 'smoke':
+        benchmark(cfg, demand, models['dqn'], models['ppo'], [101, 102, 103, 104, 105],
+                  out / 'evaluation', horizon=horizon,
+                  scenarios=['light', 'normal', 'heavy', 'rush_hour'] if publication else ['light', 'normal', 'heavy'],
+                  label='Publication candidate — inspect limitations' if publication else 'Pilot: 2 training episodes, 1 training seed')
+    print(f'CAMPAIGN_DIR={out}', flush=True)
+    return str(out)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run RL traffic experiments with optional hyperparameter sweeps"
@@ -238,6 +279,13 @@ if __name__ == "__main__":
                         help="Key=value overrides (e.g. dqn.learning_rate=0.001)")
     parser.add_argument("--output", type=str, default=None,
                         help="Path to save experiment results JSON")
+    parser.add_argument('--benchmark-profile', choices=['smoke', 'pilot', 'publication'])
+    parser.add_argument('--output-dir', help='New isolated campaign directory (must not already exist)')
     args = parser.parse_args()
 
-    run_experiments(args.config, args.sweep, args.override, args.output)
+    if args.benchmark_profile:
+        if not args.output_dir:
+            parser.error('--output-dir is required for a benchmark campaign')
+        benchmark_campaign(args.config, args.benchmark_profile, args.output_dir)
+    else:
+        run_experiments(args.config, args.sweep, args.override, args.output)

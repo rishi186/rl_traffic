@@ -1,51 +1,32 @@
-version: "3.8"
+x-rl-traffic: &rl-traffic
+  build: .
+  volumes:
+    - ./maps:/app/maps:ro
+    - ./config.yaml:/app/config.yaml:ro
+    - ./results:/app/results
 
 services:
+  smoke:
+    <<: *rl-traffic
+    entrypoint: ["python", "scripts/run_experiments.py", "--config", "config.yaml", "--benchmark-profile", "smoke"]
+    command: ["--output-dir", "results/docker-smoke"]
+
   train:
-    build: .
-    command: python scripts/train.py --config config.yaml
-    volumes:
-      - ./maps:/app/maps
-      - ./config.yaml:/app/config.yaml
-      - ./results:/app/results
-    environment:
-      - SUMO_HOME=/usr/share/sumo
+    <<: *rl-traffic
+    entrypoint: ["python", "scripts/train.py"]
+    command: ["--config", "config.yaml"]
 
   evaluate:
-    build: .
-    command: python scripts/evaluate.py --config config.yaml --model results/models/best_model.pth
-    volumes:
-      - ./maps:/app/maps
-      - ./config.yaml:/app/config.yaml
-      - ./results:/app/results
-    environment:
-      - SUMO_HOME=/usr/share/sumo
+    <<: *rl-traffic
+    entrypoint: ["python", "scripts/evaluate.py"]
+    command: ["--help"]
 
   baseline:
-    build: .
-    command: python scripts/baseline_fixed.py --config config.yaml --episodes 5
-    volumes:
-      - ./maps:/app/maps
-      - ./config.yaml:/app/config.yaml
-      - ./results:/app/results
-    environment:
-      - SUMO_HOME=/usr/share/sumo
+    <<: *rl-traffic
+    entrypoint: ["python", "scripts/baseline_fixed.py"]
+    command: ["--config", "config.yaml", "--episodes", "5"]
 
   generalization:
-    build: .
-    command: python scripts/evaluate_generalization.py --config config.yaml --model results/models/best_model.pth --mode runtime
-    volumes:
-      - ./maps:/app/maps
-      - ./config.yaml:/app/config.yaml
-      - ./results:/app/results
-    environment:
-      - SUMO_HOME=/usr/share/sumo
-
-  report:
-    build: .
-    command: >
-      sh -c "python src/visualization/plot_training.py --metrics results/training_metrics.json --output results/figures &&
-             python src/visualization/plot_comparison.py --eval results/eval/eval_results.json --baseline results/baseline/baseline_results.json --output results/figures &&
-             python scripts/generate_report.py --results-dir results"
-    volumes:
-      - ./results:/app/results
+    <<: *rl-traffic
+    entrypoint: ["python", "scripts/evaluate_generalization.py"]
+    command: ["--help"]

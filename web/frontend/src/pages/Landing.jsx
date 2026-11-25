@@ -8,7 +8,7 @@ import { fetchAPI } from '../lib/api'
 
 const FALLBACK_PROJECT = {
   name: 'Deep Q-Network Traffic Signal Optimization',
-  description: 'A production-grade DQN agent that autonomously optimises traffic signal phases across a multi-intersection urban grid using PyTorch, SUMO simulation, and the TraCI API.',
+  description: 'A reproducible DQN and PPO traffic-signal benchmark with matched SUMO demand, validation-selected checkpoints, and measured replay artifacts.',
   algorithm: 'dqn',
   total_episodes: 100,
 }
@@ -28,12 +28,12 @@ export default function Landing() {
   const features = [
     { icon: Brain, title: 'Dueling Double DQN', desc: 'Advanced Q-learning with dueling architecture, Double DQN, and PER' },
     { icon: Layers, title: 'Attention Q-Network', desc: 'Self-attention over per-lane features for spatial reasoning' },
-    { icon: Network, title: 'Multi-Agent Sharing', desc: 'Parameter sharing with agent ID embedding across intersections' },
+    { icon: Network, title: 'Multi-Agent Sharing', desc: 'Shared policy weights across intersections with a recorded observation schema' },
     { icon: Target, title: 'Soft Target Updates', desc: 'Polyak averaging for stable target network updates' },
     { icon: TrendingUp, title: 'LR Scheduling', desc: 'Cosine annealing and step LR schedulers with state persistence' },
     { icon: Zap, title: 'Gradient Clipping', desc: 'Prevents exploding gradients during training' },
-    { icon: Gauge, title: 'Reward Shaping', desc: 'Throughput bonus, switch penalty, congestion penalty' },
-    { icon: Sparkles, title: 'Early Stopping', desc: 'Patience-based termination when reward plateaus' },
+    { icon: Gauge, title: 'Reward Shaping', desc: 'Lane queue and waiting proxies, switch and congestion penalties' },
+    { icon: Sparkles, title: 'Validation Selection', desc: 'Checkpoints selected on separate validation demand and seeds' },
   ]
 
   const techStack = ['PyTorch', 'SUMO', 'TraCI', 'Gymnasium', 'FastAPI', 'React', 'TensorBoard']
@@ -43,7 +43,7 @@ export default function Landing() {
       {apiStatus === 'offline' && (
         <div className="flex items-center gap-2 px-4 py-2 bg-yellow-500/10 border-b border-yellow-500/30 text-yellow-400 text-sm justify-center">
           <AlertTriangle className="w-4 h-4" />
-          Backend offline — showing demo data. Start server: <code className="px-1 py-0.5 rounded bg-yellow-500/20">python web/server.py</code>
+          Backend offline â€” showing demo data. Start server: <code className="px-1 py-0.5 rounded bg-yellow-500/20">python web/server.py</code>
         </div>
       )}
 
@@ -55,7 +55,7 @@ export default function Landing() {
         <div className="relative max-w-6xl mx-auto px-8 py-24">
           <div className="flex items-center gap-2 mb-6">
             <span className="px-3 py-1 rounded-full bg-brand-500/10 border border-brand-500/30 text-brand-400 text-xs font-medium">
-              Production-Grade RL
+              Reproducible RL benchmark
             </span>
             <span className="px-3 py-1 rounded-full bg-slate-800 text-slate-400 text-xs font-medium">
               PyTorch + SUMO
@@ -70,7 +70,7 @@ export default function Landing() {
           </h1>
 
           <p className="text-xl text-slate-400 max-w-2xl mb-8">
-            {project?.description || 'A production-grade DQN agent that autonomously optimises traffic signal phases across a multi-intersection urban grid.'}
+            {project?.description || 'A reproducible DQN and PPO traffic-signal benchmark.'}
           </p>
 
           <div className="flex gap-4">
@@ -94,9 +94,9 @@ export default function Landing() {
           <div className="grid grid-cols-4 gap-6 mt-16">
             {[
               { label: 'Algorithm', value: project?.algorithm?.toUpperCase() || 'DQN' },
-              { label: 'Episodes', value: project?.total_episodes || '100' },
+              { label: 'Configured episodes', value: project?.total_episodes || '100' },
               { label: 'Experiments', value: experiments.length },
-              { label: 'Features', value: '12+' },
+              { label: 'Policies compared', value: '4' },
             ].map((stat) => (
               <div key={stat.label} className="text-center">
                 <div className="text-3xl font-bold text-white">{stat.value}</div>
@@ -172,7 +172,7 @@ export default function Landing() {
       {/* Footer */}
       <footer className="border-t border-slate-800 mt-20">
         <div className="max-w-6xl mx-auto px-8 py-8 flex items-center justify-between">
-          <p className="text-sm text-slate-500">RL Traffic Signal Optimization — Built with PyTorch & SUMO</p>
+          <p className="text-sm text-slate-500">RL Traffic Signal Optimization â€” Built with PyTorch & SUMO</p>
           <div className="flex items-center gap-2 text-sm text-slate-500">
             <CheckCircle2 className="w-4 h-4 text-green-500" />
             All systems operational
