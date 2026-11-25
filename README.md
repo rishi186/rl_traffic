@@ -4,9 +4,27 @@ Compare **fixed time, SUMO actuated, PyTorch DQN and PyTorch PPO** on a modeled
 road network in central Tirupati, India. The FastAPI and React demo replays
 600 seconds of a matched fixed-time and DQN simulation.
 
-[Run the web demo](#quick-start-windows) · [Open the map in SUMO](#open-the-tirupati-map) ·
+[Tirupati results](#tirupati-benchmark-results) · [Run the web demo](#quick-start-windows) ·
+[Open the map in SUMO](#open-the-tirupati-map) ·
 [Run all four policies](#reproduce-smoke-pilot-or-publication-candidate) ·
-[Read the Bengaluru pilot results](#measured-results-and-limits)
+[Read the Bengaluru pilot results](#bengaluru-pilot-results)
+
+## Tirupati benchmark results
+
+Each policy ran the same normal-demand scenario with 120 synthetic trips, SUMO
+seed 101, and 600 measured seconds after a five-second warm-up.
+
+| Policy | Network stopped vehicle-seconds ↓ | Trips completed | Trips unfinished | Mean wait per completed trip ↓ |
+|---|---:|---:|---:|---:|
+| Fixed time | 668 | 117/120 | 3 | 4.11 s |
+| SUMO actuated | **241** | 118/120 | 2 | **1.04 s** |
+| DQN | 264 | 118/120 | 2 | 1.24 s |
+| PPO | 328 | 118/120 | 2 | 1.62 s |
+
+All 120 trips entered the network for every policy. SUMO actuated recorded the
+fewest stopped vehicle-seconds in this run. DQN and PPO each trained for two
+episodes with seed 42. These results describe one matched evaluation seed.
+[Raw CSV](docs/benchmark/tirupati/raw.csv) · [Run manifest](docs/benchmark/tirupati/manifest.json)
 
 ## Quick start (Windows)
 
@@ -190,7 +208,7 @@ produce an error, never placeholder metrics. The API checks hashes, match IDs,
 time alignment and timeline totals against raw data. This is artifact playback,
 not an interactive live SUMO execution or a video.
 
-## Measured results and limits
+## Bengaluru pilot results
 
 Completed Bengaluru pilot: 60 real SUMO evaluations (three demands, five matched seeds,
 four policies), with 300 measured seconds plus five warm-up seconds per run.
