@@ -52,8 +52,9 @@ The tiny one-junction fixture is checked in with netconvert input files. Integra
 tests start a real simulator and verify shutdown. Tests also cover action timing,
 network accounting, PPO behavior alignment and GAE, singleton updates, checkpoint
 schemas, replay boundaries, missing matches and exact episode-boundary resume.
-CI installs SUMO, executes integration checks and builds React with `npm ci`.
-GitHub CI itself has not been run by this local upgrade.
+GitHub Actions starts real SUMO integrations, builds the React frontend and
+runs the four-policy Docker smoke campaign.
+[CI workflow runs](https://github.com/rishi186/rl_traffic/actions)
 
 ## Reproduce smoke, pilot or publication candidate
 
